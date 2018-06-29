@@ -12,13 +12,31 @@ const stats = require('../Stats').client;
 class MongoDB extends BasicService {
     /**
      * Создание модели по объекту-конфигу.
+     * Дополнительно вторым аргументом можно указать конфиг,
+     * который будет применяться к уже готовой схеме,
+     * например составные индексы.
      * О схемах детальнее описано в документации Mongoose.
      * @param {string} name Имя модели.
-     * @param {Object} config Схема-конфиг модели в виде простого объета.
+     * @param {Object} schemaConfig Схема-конфиг модели в виде простого объета.
+     * @param {Object} optionsConfig Конфиг настроек уровня схемы.
+     * @param {Array<Object,Object>} optionsConfig.index
+     * Массив конфигов индексов, состоящий из объектов с ключем fields
+     * для обозначения полей индекса и ключем options для дополнительных опций.
+     * Например {fields: {user: 1, data: 1}, options: {sparse: true}}
+     * опишет составной индекс с указанием пропуска значений с null.
+     * О схемах детальнее описано в документации Mongoose.
      * @returns {Model} Модель.
      */
-    static makeModel(name, config) {
-        return mongoose.model(name, new mongoose.Schema(config));
+    static makeModel(name, schemaConfig, optionsConfig) {
+        const schema = new mongoose.Schema(schemaConfig);
+
+        if (optionsConfig.index) {
+            for (let indexConfig of optionsConfig.index) {
+                schema.index(...indexConfig);
+            }
+        }
+
+        return mongoose.model(name, schema);
     }
 
     /**
