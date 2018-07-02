@@ -2,113 +2,89 @@ const WebSocket = require('ws');
 const logger = require('../Logger');
 const stats = require('../Stats');
 const env = require('../Env');
+const BasicService = require('./Basic');
+const GateServer = require('./GateServer');
+const GateClient = require('./GateClient');
 // TODO -
 
 const NOOP = () => {};
 
-class Gate {
-    constructor() {
-        this._connections = [];
-        this._server = null;
-        this._serverDeadMapping = new Map();
-        this._brokenDropperIntervalId = null;
-    }
+class Gate extends BasicService {
+    async start({ clientRoutesObject = null, serverRoutesObject = null }) {
+        const serializer = this._serializeMessage.bind(this);
+        const deserializer = this._deserializeMessage.bind(this);
+        const clientRouter = this._makeClientRouter(clientRoutesObject);
+        const serverRouter = this._makeServerRouter(serverRoutesObject);
 
-    async start(connectionList, makeServer) {
-        for (let connectionString of connectionList) {
-            await this._connectTo(connectionString);
+        if (clientRoutesObject) {
+            this._client = new GateClient(clientRouter, serializer);
+
+            this.addNested(this._client);
+            await this._client.start();
         }
 
-        if (makeServer) {
-            await this._makeServer();
+        if (serverRoutesObject) {
+            const server = new GateServer(serverRouter, deserializer);
+
+            this.addNested(server);
+            await server.start();
         }
     }
 
     async stop() {
-        clearInterval(this._brokenDropperIntervalId);
-
-        if (this._server) {
-            this._server.close();
-        }
-
-        for (let connection of this._connections) {
-            connection.terminate();
-        }
+        await this.stopNested();
     }
 
-    async _connectTo(connectionString) {
-        logger.info(`Make Gate-client for ${connectionString}`);
-
-        const timer = new Date();
-        // TODO -
+    async sendTo(service, target, data) {
+        this._client.sendTo(service, target, data);
     }
 
-    async _makeServer() {
-        logger.info('Make Gate-server...');
+    _serializeMessage(data) {
+        let result;
 
-        const timer = new Date();
-        const port = env.GATE_SERVER_PORT;
-
-        this._server = new WebSocket.Server({ port });
-
-        this._server.on('connection', this._handleServerConnection.bind(this));
-        this._makeBrokenDropper();
-
-        stats.timing('make_gate_server', new Date() - timer);
-        logger.info(`Gate-server listening at ${port}`);
-    }
-
-    _handleServerConnection(socket, request) {
-        const from = this._getRequestAddressLogString(request);
-
-        socket.on('message', message => {
-            this._serverDeadMapping.set(socket, false);
-            this._handleServerMessage(socket, message);
-        });
-
-        socket.on('open', () => {
-            logger.log(`Gate-server connection open - ${from}`);
-        });
-
-        socket.on('close', () => {
-            logger.log(`Gate-server connection close - ${from}`);
-        });
-
-        socket.on('pong', () => {
-            this._serverDeadMapping.set(socket, false);
-        });
-    }
-
-    _getRequestAddressLogString(request) {
-        const ip = request.connection.remoteAddress;
-        const forwardHeader = request.headers['x-forwarded-for'];
-        let forward = '';
-        let result = ip;
-
-        if (forwardHeader) {
-            forward = forwardHeader.split(/\s*,\s*/)[0];
-            result += `<= ${forward}`;
+        try {
+            result = JSON.stringify(data);
+        } catch (error) {
+            logger.error(`Gate serialization error - ${error}`);
+            process.exit(1);
         }
 
         return result;
     }
 
-    _makeBrokenDropper() {
-        const map = this._serverDeadMapping;
+    _deserializeMessage(message) {
+        let data;
 
-        this._brokenDropperIntervalId = setInterval(() => {
-            for (let socket of this._server.clients) {
-                if (map.get(socket) === true) {
-                    socket.terminate();
-                } else {
-                    map.set(socket, true);
-                    socket.ping(NOOP);
-                }
-            }
-        }, env.GATE_SERVER_TIMEOUT);
+        try {
+            data = JSON.parse(message);
+        } catch (error) {
+            return { error };
+        }
+
+        return data;
     }
 
-    _handleServerMessage(message) {
-        //
+    _makeServerRouter(config) {
+        return (data, socket) => {
+            const routes = config.routes;
+            const scope = config.scope || null;
+            const target = data.target;
+
+            if (routes[target]) {
+                routes[target].call(scope, data, socket);
+            } else {
+                socket.send(
+                    this._serializeMessage({ error: 'Route not found' })
+                );
+            }
+        };
+    }
+
+    _makeClientRouter(config) {
+        return (data, socket) => {
+            //
+        };
     }
 }
+
+module.exports = Gate;
