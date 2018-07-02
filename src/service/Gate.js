@@ -1,34 +1,12 @@
-const WebSocket = require('ws');
 const logger = require('../Logger');
-const stats = require('../Stats');
-const env = require('../Env');
 const BasicService = require('./Basic');
 const GateServer = require('./GateServer');
 const GateClient = require('./GateClient');
-// TODO -
-
-const NOOP = () => {};
 
 class Gate extends BasicService {
-    async start({ clientRoutesObject = null, serverRoutesObject = null }) {
-        const serializer = this._serializeMessage.bind(this);
-        const deserializer = this._deserializeMessage.bind(this);
-        const clientRouter = this._makeClientRouter(clientRoutesObject);
-        const serverRouter = this._makeServerRouter(serverRoutesObject);
-
-        if (clientRoutesObject) {
-            this._client = new GateClient(clientRouter, serializer);
-
-            this.addNested(this._client);
-            await this._client.start();
-        }
-
-        if (serverRoutesObject) {
-            const server = new GateServer(serverRouter, deserializer);
-
-            this.addNested(server);
-            await server.start();
-        }
+    async start({ serverRoutes = null, requiredServices = [] }) {
+        await this._initServer(serverRoutes);
+        await this._initClients(requiredServices);
     }
 
     async stop() {
@@ -39,51 +17,42 @@ class Gate extends BasicService {
         this._client.sendTo(service, target, data);
     }
 
-    _serializeMessage(data) {
-        let result;
-
-        try {
-            result = JSON.stringify(data);
-        } catch (error) {
-            logger.error(`Gate serialization error - ${error}`);
-            process.exit(1);
+    async _initServer(routesConfig) {
+        if (!routesConfig) {
+            return;
         }
 
-        return result;
+        this._server = new GateServer(routesConfig);
+
+        this.addNested(this._server);
+        await this._server.start();
     }
 
-    _deserializeMessage(message) {
-        let data;
-
-        try {
-            data = JSON.parse(message);
-        } catch (error) {
-            return { error };
+    async _initClients(servicesList) {
+        if (!servicesList.length) {
+            return;
         }
 
-        return data;
-    }
+        let mapping = await this._getServicesAddressMapping();
 
-    _makeServerRouter(config) {
-        return (data, socket) => {
-            const routes = config.routes;
-            const scope = config.scope || null;
-            const target = data.target;
+        for (let serviceName of servicesList) {
+            const address = mapping[serviceName];
 
-            if (routes[target]) {
-                routes[target].call(scope, data, socket);
-            } else {
-                socket.send(
-                    this._serializeMessage({ error: 'Route not found' })
-                );
+            if (!address) {
+                logger.log(`Gate - invalid service name - ${serviceName}`);
+                process.exit(1);
             }
-        };
+
+            this._client = new GateClient(address);
+
+            this.addNested(this._client);
+            await this._client.start();
+        }
     }
 
-    _makeClientRouter(config) {
-        return (data, socket) => {
-            //
-        };
+    async _getServicesAddressMapping() {
+        const timer = new Date();
+        // TODO -
     }
 }
 

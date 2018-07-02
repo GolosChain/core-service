@@ -3,18 +3,16 @@ const logger = require('../Logger');
 const stats = require('../Stats');
 const env = require('../Env');
 const BasicService = require('./Basic');
-
-const NOOP = () => {};
+const GateUtils = require('../GateUtils');
 
 class GateServer extends BasicService {
-    constructor(router, deserializer) {
+    constructor(routesConfig) {
         super();
 
         this._server = null;
         this._deadMapping = new Map();
         this._brokenDropperIntervalId = null;
-        this._router = router;
-        this._deserializer = deserializer;
+        this._router = this._makeRouter(routesConfig);
     }
 
     async start() {
@@ -84,14 +82,14 @@ class GateServer extends BasicService {
                     socket.terminate();
                 } else {
                     map.set(socket, true);
-                    socket.ping(NOOP);
+                    socket.ping(GateUtils.noop);
                 }
             }
         }, env.GATE_SERVER_TIMEOUT);
     }
 
     _handleMessage(socket, message, from) {
-        const data = this._deserializer(message);
+        const data = GateUtils.deserializeMessage(message);
 
         if (data.error) {
             this._handleConnectionError(socket, data, from);
@@ -105,8 +103,24 @@ class GateServer extends BasicService {
         logger.error(`Gate server connection {${from}} error - ${data.error}`);
     }
 
-    _routeMessage(socket, data) {
-        this._router(data, socket);
+    _makeRouter(config) {
+        return (data, responseSender) => {
+            const routes = config.routes;
+            const scope = config.scope || null;
+            const target = data.target;
+
+            if (routes[target]) {
+                routes[target].call(scope, data, responseSender);
+            } else {
+                responseSender({ error: 'Route not found' });
+            }
+        };
+    }
+
+    _routeMessage(socket, requestData) {
+        this._router(requestData, responseData => {
+            socket.send(GateUtils.serializeMessage(responseData));
+        });
     }
 }
 
