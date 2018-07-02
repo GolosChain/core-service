@@ -44,6 +44,10 @@ class Moments {
             .diff(diff);
     }
 
+    static get oneMinute() {
+        return moment.duration(1, 'minute');
+    }
+
     /**
      * Один день в виде объекта Duration.
      * @returns {moment.Duration} Время как объект интервала moment.js.
