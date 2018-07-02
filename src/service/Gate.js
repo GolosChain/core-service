@@ -4,6 +4,12 @@ const GateServer = require('./GateServer');
 const GateClient = require('./GateClient');
 
 class Gate extends BasicService {
+    constructor() {
+        super();
+
+        this._clientsMap = new Map();
+    }
+
     async start({ serverRoutes = null, requiredServices = [] }) {
         await this._initServer(serverRoutes);
         await this._initClients(requiredServices);
@@ -14,7 +20,13 @@ class Gate extends BasicService {
     }
 
     async sendTo(service, target, data) {
-        this._client.sendTo(service, target, data);
+        return await this._clientsMap.get(service).send(target, data);
+    }
+
+    async describeTo(service, target, data, callback) {
+        return await this._clientsMap
+            .get(service)
+            .describe(target, data, callback);
     }
 
     async _initServer(routesConfig) {
@@ -43,10 +55,12 @@ class Gate extends BasicService {
                 process.exit(1);
             }
 
-            this._client = new GateClient(address);
+            const client = new GateClient(address);
 
-            this.addNested(this._client);
-            await this._client.start();
+            this._clientsMap.set(serviceName, client);
+
+            this.addNested(client);
+            await client.start();
         }
     }
 

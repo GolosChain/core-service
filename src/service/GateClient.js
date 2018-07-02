@@ -1,22 +1,29 @@
+const logger = require('../Logger');
+const stats = require('../Stats');
+const env = require('../Env');
 const BasicService = require('./Basic');
-// TODO -
+const GateUtils = require('../GateUtils');
 
 class GateClient extends BasicService {
-    constructor() {
+    constructor(address) {
         super();
 
-        this._connections = [];
+        this._address = address;
     }
 
     async start() {
-        for (let connectionString of connectionList) {
-            await this._connectTo(connectionString);
-        }
+        // TODO -
     }
 
     async stop() {
-        for (let connection of this._connections) {
-            connection.terminate();
-        }
+        // TODO -
+    }
+
+    async send(target, data) {
+        // TODO -
+    }
+
+    async describe(target, data, callback) {
+        // TODO -
     }
 }
