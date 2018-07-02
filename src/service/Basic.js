@@ -1,4 +1,5 @@
 const logger = require('../Logger');
+const env = require('../Env');
 
 /**
  * Базовый сервис, выступающий в роле абстрактного сервиса с частью уже
@@ -173,6 +174,29 @@ class Basic {
      */
     stopLoop() {
         clearInterval(this._loopId);
+    }
+
+    /**
+     * Распечатывает конфигурацию микросервиса, устанавливаемую через
+     * ENV-переменые. Конфигурация корневых классов будет распечатана
+     * автоматически, для распечатки конфигурации самого микросервиса
+     * необходимо передать объект env-модуля в параметры метода.
+     * @param {Object} serviceEnv Модуль конфигурации уровня микросервиса.
+     */
+    printEnvBasedConfig(serviceEnv = {}) {
+        logger.info('ENV-based config:');
+
+        logger.info('Core config params:');
+        for (let key in Object.keys(env)) {
+            logger.info(`${key} = ${env[key]}`);
+        }
+        logger.info('End core config params.');
+
+        logger.info('Service config params:');
+        for (let key in Object.keys(serviceEnv)) {
+            logger.info(`${key} = ${serviceEnv[key]}`);
+        }
+        logger.info('End service config params.');
     }
 }
 
