@@ -24,9 +24,7 @@ class Gate extends BasicService {
     }
 
     async describeTo(service, target, data, callback) {
-        return await this._clientsMap
-            .get(service)
-            .describe(target, data, callback);
+        await this._clientsMap.get(service).describe(target, data, callback);
     }
 
     async _initServer(routesConfig) {

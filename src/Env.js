@@ -1,7 +1,7 @@
 // Описание переменных окружения смотри в Readme.
 const env = process.env;
 const Moments = require('./Moments');
-const minute = Moments.oneMinute;
+const minute = +(Moments.oneMinute);
 
 module.exports = {
     MONGO_CONNECT_STRING: env.MONGO_CONNECT_STRING || 'mongodb://mongo/admin',

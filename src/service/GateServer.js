@@ -54,6 +54,10 @@ class GateServer extends BasicService {
             logger.log(`Gate server connection close - ${from}`);
         });
 
+        socket.on('error', error => {
+            // TODO -
+        });
+
         socket.on('pong', () => {
             this._deadMapping.set(socket, false);
         });
@@ -110,7 +114,10 @@ class GateServer extends BasicService {
             const target = data.target;
 
             if (routes[target]) {
-                routes[target].call(scope, data, responseSender);
+                routes[target]
+                    .call(scope, data)
+                    .then(responseSender)
+                    .catch(responseSender);
             } else {
                 responseSender({ error: 'Route not found' });
             }

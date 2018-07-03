@@ -187,13 +187,13 @@ class Basic {
         logger.info('ENV-based config:');
 
         logger.info('Core config params:');
-        for (let key in Object.keys(env)) {
+        for (let key of Object.keys(env)) {
             logger.info(`${key} = ${env[key]}`);
         }
         logger.info('End core config params.');
 
         logger.info('Service config params:');
-        for (let key in Object.keys(serviceEnv)) {
+        for (let key of Object.keys(serviceEnv)) {
             logger.info(`${key} = ${serviceEnv[key]}`);
         }
         logger.info('End service config params.');
