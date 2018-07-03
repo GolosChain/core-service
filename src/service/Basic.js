@@ -184,19 +184,25 @@ class Basic {
      * @param {Object} serviceEnv Модуль конфигурации уровня микросервиса.
      */
     printEnvBasedConfig(serviceEnv = {}) {
+        logger.info('---');
         logger.info('ENV-based config:');
-
+        logger.info('---');
         logger.info('Core config params:');
+
         for (let key of Object.keys(env)) {
             logger.info(`${key} = ${env[key]}`);
         }
-        logger.info('End core config params.');
 
+        logger.info('End core config params.');
+        logger.info('---');
         logger.info('Service config params:');
+
         for (let key of Object.keys(serviceEnv)) {
             logger.info(`${key} = ${serviceEnv[key]}`);
         }
+
         logger.info('End service config params.');
+        logger.info('---');
     }
 }
 
