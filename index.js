@@ -6,5 +6,6 @@ module.exports = {
         Basic: require('./src/service/Basic'),
         BlockSubscribe: require('./src/service/BlockSubscribe'),
         MongoDB: require('./src/service/MongoDB'),
+        Gate: require('./src/service/Gate'),
     },
 };
