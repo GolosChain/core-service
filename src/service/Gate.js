@@ -78,6 +78,8 @@ class Gate extends BasicService {
                 );
             };
         }
+
+        return routes;
     }
 }
 
