@@ -1,4 +1,5 @@
 const jayson = require('jayson');
+const env = require('../Env');
 
 class Gate {
     constructor() {
