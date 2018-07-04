@@ -1,8 +1,11 @@
 const jayson = require('jayson');
 const env = require('../Env');
+const BasicService = require('./Basic');
 
-class Gate {
+class Gate extends BasicService {
     constructor() {
+        super();
+
         this._server = null;
         this._clientsMap = new Map();
     }
