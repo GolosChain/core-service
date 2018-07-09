@@ -8,5 +8,5 @@ module.exports = {
     BLOCKCHAIN_NODE_ADDRESS: env.BLOCKCHAIN_NODE_ADDRESS || 'wss://ws.golos.io',
     METRICS_HOST: env.METRICS_HOST || 'localhost',
     METRICS_PORT: env.METRICS_PORT || 8125,
-    GATE_LISTEN_PORT: env.GATE_SERVER_PORT || 8080,
+    GATE_LISTEN_PORT: env.GATE_LISTEN_PORT || 8080,
 };
