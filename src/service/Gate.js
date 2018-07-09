@@ -82,9 +82,9 @@ class Gate extends BasicService {
         return routes;
     }
 
-    _makeDefaultRequiredClientsConfig(env) {
+    _makeDefaultRequiredClientsConfig() {
         return {
-            solzhenitsyn: env.SOLZHENITSYN_CONNECT_STRING,
+            solzhenitsyn: process.env.SOLZHENITSYN_CONNECT_STRING,
         };
     }
 }
