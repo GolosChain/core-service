@@ -20,7 +20,7 @@ class Gate extends BasicService {
         }
     }
 
-    stop() {
+    async stop() {
         this._server.close();
     }
 
@@ -80,6 +80,12 @@ class Gate extends BasicService {
         }
 
         return routes;
+    }
+
+    _makeDefaultRequiredClientsConfig(env) {
+        return {
+            solzhenitsyn: env.SOLZHENITSYN_CONNECT_STRING,
+        };
     }
 }
 
