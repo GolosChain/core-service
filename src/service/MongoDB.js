@@ -32,7 +32,7 @@ class MongoDB extends BasicService {
 
         if (optionsConfig.index) {
             for (let indexConfig of optionsConfig.index) {
-                schema.index(...indexConfig);
+                schema.index(indexConfig.fields, indexConfig.options);
             }
         }
 
