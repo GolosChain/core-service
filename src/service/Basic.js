@@ -1,3 +1,4 @@
+const EventEmitter = require('events');
 const logger = require('../Logger');
 const env = require('../Env');
 
@@ -39,11 +40,18 @@ const env = require('../Env');
  *
  * Дополнительно предусмотренна установка сервиса в режим автоотключения
  * при завершении процесса по сигналу SIGINT (Ctrl-C и прочее).
+ *
+ * Каждый сервис снабжен эмиттером эвентов, являющимся инстансом
+ * стандарнтого EventEmitter от NodeJS. Для удобства имеются методы-шоткаты
+ * emit и on, для других действий с эвентами необходимо напрямую использовать
+ * интсанс, получаемый по getEmitter().
  */
 class Basic {
     constructor() {
         this._nestedServices = [];
         this._done = false;
+
+        this._emitter = new EventEmitter();
     }
 
     /**
@@ -97,7 +105,7 @@ class Basic {
 
     /**
      * Добавляет 1 или более сервисов в зависимость к этому сервису.
-     * @param {Array<Basic>} services Сервисы.
+     * @param {Basic} services Сервисы.
      */
     addNested(...services) {
         this._nestedServices.push(...services);
@@ -157,8 +165,8 @@ class Basic {
 
     /**
      * Запускает итератор сервиса.
-     * @param {number} firstIterationTimeout Отсрочка запуска первой итерации.
-     * @param {number} interval Интервал между запусками итераций.
+     * @param {number} [firstIterationTimeout] Отсрочка запуска первой итерации.
+     * @param {number} [interval] Интервал между запусками итераций.
      */
     startLoop(firstIterationTimeout = 0, interval = Infinity) {
         setTimeout(async () => {
@@ -181,7 +189,7 @@ class Basic {
      * ENV-переменые. Конфигурация корневых классов будет распечатана
      * автоматически, для распечатки конфигурации самого микросервиса
      * необходимо передать объект env-модуля в параметры метода.
-     * @param {Object} serviceEnv Модуль конфигурации уровня микросервиса.
+     * @param {Object} [serviceEnv] Модуль конфигурации уровня микросервиса.
      */
     printEnvBasedConfig(serviceEnv = {}) {
         logger.info('ENV-based config:');
@@ -201,6 +209,37 @@ class Basic {
         }
 
         logger.info('---');
+    }
+
+    /**
+     * Эмиттер событий сервиса, необходим для подписки на события.
+     * Возвращаемый инстранс эмиттера является стандартным
+     * эмиттером NodeJS.
+     * @returns {EventEmitter} Эмиттер событий сервиса.
+     */
+    getEmitter() {
+        return this._emitter;
+    }
+
+    /**
+     * Шоткат для запуска эвента.
+     * Запускает эвент с указанным именем.
+     * Данные, при необходимости, можно передать аргментами
+     * через запятую.
+     * @param {string} name Имя события.
+     * @param {any} [data] Данные.
+     */
+    emit(name, ...data) {
+        this._emitter.emit(name, ...data);
+    }
+
+    /**
+     * Подписка на эвент с указанным именем.
+     * @param {string} name Имя эвента.
+     * @param {Function} callback Колбек.
+     */
+    on(name, callback) {
+        this._emitter.on(name, callback);
     }
 }
 

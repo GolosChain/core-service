@@ -18,7 +18,7 @@ class MongoDB extends BasicService {
      * О схемах детальнее описано в документации Mongoose.
      * @param {string} name Имя модели.
      * @param {Object} schemaConfig Схема-конфиг модели в виде простого объета.
-     * @param {Object} optionsConfig Конфиг настроек уровня схемы.
+     * @param {Object} [optionsConfig] Конфиг настроек уровня схемы.
      * @param {Array<Object,Object>} optionsConfig.index
      * Массив конфигов индексов, состоящий из объектов с ключем fields
      * для обозначения полей индекса и ключем options для дополнительных опций.
@@ -51,7 +51,7 @@ class MongoDB extends BasicService {
     /**
      * Запуск, подключение к базе даннх на основе переменных
      * окружения, либо по явно указанной строке подключеня.
-     * @param {string/null} forceConnectString Строка подключения,
+     * @param {string/null} [forceConnectString] Строка подключения,
      * не обязательна.
      * @returns {Promise<any>} Промис без экстра данных.
      */
