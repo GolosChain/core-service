@@ -6,6 +6,15 @@ const env = require('./Env');
  */
 class Moments {
     /**
+     * Время в прошлом относительно текущей даты.
+     * @param {Number} milliseconds Количество миллисекунд отступа назад.
+     * @returns {moment.Moment} Время в прошлом.
+     */
+    static ago(milliseconds) {
+        return moment().subtract(moment.duration(milliseconds, 'ms'));
+    }
+
+    /**
      * Время начала текущего дня.
      * Учитывает сдвиг из конфигурации DAY_START, смотри Readme.
      * @returns {moment.Moment} Время как объект moment.js.
