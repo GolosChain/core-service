@@ -36,7 +36,7 @@ class BlockSubscribeRestore extends BasicService {
 
         if (!this._syncedBlockNum) {
             logger.log(
-                'Empty Post collection,',
+                'Empty sync collection,',
                 `then start sync from block ${previousBlockNum}`
             );
             this._syncedBlockNum = previousBlockNum;
