@@ -75,7 +75,7 @@ class BlockSubscribeRestore extends BasicService {
             .then(data => {
                 stats.timing('block_restore', new Date() - timer);
                 setImmediate(this._sync.bind(this));
-                this._blockHandler(data);
+                this._blockHandler(data, blockNum);
             })
             .catch(this._blockErrorHandler);
     }
