@@ -29,7 +29,7 @@ class BlockSubscribe extends BasicService {
      * и переправляет все данные в сериализованном виде в указанный
      * callback.
      * @param {Function} callback Функция, которая будет получать данные
-     * каждого нового блока.
+     * каждого нового блока. Первым аргументом идет блок, вторым - его номер.
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async start(callback) {
@@ -66,7 +66,10 @@ class BlockSubscribe extends BasicService {
                 return;
             }
 
-            return callback(response.result);
+            const data = response.result;
+            const blockNum = this._extractBlockNum(data);
+
+            return callback(data, blockNum);
         });
         this._socket.on('open', () => {
             logger.info('BlockSubscribe websocket connection established.');
@@ -90,6 +93,13 @@ class BlockSubscribe extends BasicService {
         stats.increment('block_subscribe_error');
         logger.error(`BlockSubscribe websocket error - ${error}`);
         process.exit(1);
+    }
+
+    _extractBlockNum(data) {
+        const previousHash = data.previous;
+        const previousBlockNum = parseInt(previousHash.slice(0, 8), 16);
+
+        return previousBlockNum + 1;
     }
 }
 
