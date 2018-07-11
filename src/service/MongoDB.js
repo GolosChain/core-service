@@ -28,7 +28,7 @@ class MongoDB extends BasicService {
      * @returns {Model} Модель.
      */
     static makeModel(name, schemaConfig, optionsConfig = {}) {
-        const schema = new mongoose.Schema(schemaConfig);
+        const schema = new mongoose.Schema(schemaConfig, { timestamps: true });
 
         if (optionsConfig.index) {
             for (let indexConfig of optionsConfig.index) {
