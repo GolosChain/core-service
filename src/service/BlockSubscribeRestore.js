@@ -81,3 +81,5 @@ class BlockSubscribeRestore extends BasicService {
             .catch(this._blockErrorHandler);
     }
 }
+
+module.exports = BlockSubscribeRestore;
