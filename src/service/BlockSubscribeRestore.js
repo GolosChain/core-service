@@ -29,11 +29,10 @@ class BlockSubscribeRestore extends BasicService {
         stats.timing('last_block_num_search', new Date() - timer);
     }
 
-    trySync(data) {
-        const previousHash = data.previous;
-        const previousBlockNum = parseInt(previousHash.slice(0, 8), 16);
+    trySync(data, blockNum) {
+        const previousBlockNum = blockNum - 1;
 
-        this._currentBlockNum = previousBlockNum + 1;
+        this._currentBlockNum = blockNum;
 
         if (!this._syncedBlockNum) {
             logger.log(
