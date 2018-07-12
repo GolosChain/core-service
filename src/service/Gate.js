@@ -38,6 +38,13 @@ class Gate extends BasicService {
         });
     }
 
+    makeDefaultRequiredClientsConfig() {
+        return {
+            solzhenitsyn: process.env.SOLZHENITSYN_CONNECT_STRING,
+            bulgakov: process.env.BULGAKOV_CONNECT_STRING,
+        };
+    }
+
     _startServer(rawRoutes) {
         const routes = this._normalizeRoutes(rawRoutes);
 
@@ -80,12 +87,6 @@ class Gate extends BasicService {
         }
 
         return routes;
-    }
-
-    _makeDefaultRequiredClientsConfig() {
-        return {
-            solzhenitsyn: process.env.SOLZHENITSYN_CONNECT_STRING,
-        };
     }
 }
 
