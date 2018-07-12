@@ -42,6 +42,7 @@ class Gate extends BasicService {
         return {
             solzhenitsyn: process.env.SOLZHENITSYN_CONNECT_STRING,
             bulgakov: process.env.BULGAKOV_CONNECT_STRING,
+            notify: process.env.NOTIFY_CONNECT_STRING,
         };
     }
 
