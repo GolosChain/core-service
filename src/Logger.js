@@ -28,12 +28,7 @@ class Logger {
     }
 
     static _log(prefix, data, color) {
-        console.log.apply(console, [
-            this._now(),
-            `<${process.pid}>`,
-            prefix[color],
-            ...data,
-        ]);
+        console.log.apply(console, [this._now(), `<${process.pid}>`, prefix[color], ...data]);
     }
 
     static _now() {

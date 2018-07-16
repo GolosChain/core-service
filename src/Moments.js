@@ -53,6 +53,10 @@ class Moments {
             .diff(diff);
     }
 
+    /**
+     * Одна минута в виде объекта Duration.
+     * @returns {moment.Duration} Время как объект moment.js.
+     */
     static get oneMinute() {
         return moment.duration(1, 'minute');
     }
