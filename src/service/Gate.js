@@ -38,14 +38,6 @@ class Gate extends BasicService {
         });
     }
 
-    makeDefaultRequiredClientsConfig() {
-        return {
-            solzhenitsyn: process.env.SOLZHENITSYN_CONNECT_STRING,
-            bulgakov: process.env.BULGAKOV_CONNECT_STRING,
-            notify: process.env.NOTIFY_CONNECT_STRING,
-        };
-    }
-
     _startServer(rawRoutes) {
         const routes = this._normalizeRoutes(rawRoutes);
 
