@@ -21,7 +21,9 @@ class Gate extends BasicService {
     }
 
     async stop() {
-        this._server.close();
+        if (this._server) {
+            this._server.close();
+        }
     }
 
     sendTo(service, method, data) {

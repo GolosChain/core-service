@@ -1,6 +1,6 @@
 {
     "name": "griboyedov",
-    "version": "0.10.1",
+    "version": "0.10.2",
     "description": "",
     "main": "index.js",
     "scripts": {
@@ -10,7 +10,8 @@
         "singleQuote": true,
         "tabWidth": 4,
         "semi": true,
-        "trailingComma": "es5"
+        "trailingComma": "es5",
+        "printWidth": 100
     },
     "author": "golos.io",
     "license": "GPL-3.0",
