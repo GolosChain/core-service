@@ -41,7 +41,8 @@ const env = require('../Env');
  * Каждый сервис снабжен эмиттером эвентов, являющимся инстансом
  * стандарнтого EventEmitter от NodeJS. Для удобства имеются методы-шоткаты
  * emit и on, для других действий с эвентами необходимо напрямую использовать
- * интсанс, получаемый по getEmitter().
+ * интсанс, получаемый по getEmitter(). Также возможно транслировать эвенты
+ * из других объектов через себя.
  */
 class Basic {
     constructor() {
@@ -223,16 +224,27 @@ class Basic {
      * Запускает эвент с указанным именем.
      * Данные, при необходимости, можно передать аргментами
      * через запятую.
-     * @param {string} name Имя события.
-     * @param {any} [data] Данные.
+     * @param {string/Symbol} name Имя события.
+     * @param {...any} [data] Данные.
      */
     emit(name, ...data) {
         this._emitter.emit(name, ...data);
     }
 
     /**
+     * Трансляция эвентов целевого объекта через себя.
+     * @param {any} from Эмиттер, эвенты которого необходимо транслировать.
+     * @param {...string/...Symbol} events Список эвентов.
+     */
+    translateEmit(from, ...events) {
+        for (let event of events) {
+            from.on(event, (...args) => this.emit(event, ...args));
+        }
+    }
+
+    /**
      * Подписка на эвент с указанным именем.
-     * @param {string} name Имя эвента.
+     * @param {string/Symbol} name Имя эвента.
      * @param {Function} callback Колбек.
      */
     on(name, callback) {
