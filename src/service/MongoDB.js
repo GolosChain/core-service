@@ -70,7 +70,7 @@ class MongoDB extends BasicService {
                 resolve();
             });
 
-            mongoose.connect(forceConnectString || env.GLS_MONGO_CONNECT_STRING);
+            mongoose.connect(forceConnectString || env.GLS_MONGO_CONNECT);
         });
     }
 

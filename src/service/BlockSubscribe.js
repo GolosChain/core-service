@@ -33,7 +33,7 @@ class BlockSubscribe extends BasicService {
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async start(callback) {
-        this._socket = new WebSocket(env.GLS_BLOCKCHAIN_NODE_ADDRESS);
+        this._socket = new WebSocket(env.GLS_BLOCKCHAIN_CONNECT);
 
         this._makeSocketHandlers(callback);
         this._startSocketWatchDog();
