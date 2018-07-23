@@ -23,8 +23,8 @@ class Stats {
 
     static _init() {
         this._client = new StatsDClient({
-            host: env.METRICS_HOST,
-            port: env.METRICS_PORT,
+            host: env.GLS_METRICS_HOST,
+            port: env.GLS_METRICS_PORT,
         });
 
         this._client.socket.on('error', error => {

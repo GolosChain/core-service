@@ -16,7 +16,7 @@ class Moments {
 
     /**
      * Время начала текущего дня.
-     * Учитывает сдвиг из конфигурации DAY_START, смотри Readme.
+     * Учитывает сдвиг из конфигурации GLS_DAY_START, смотри Readme.
      * @returns {moment.Moment} Время как объект moment.js.
      */
     static get currentDayStart() {
@@ -28,7 +28,7 @@ class Moments {
 
     /**
      * Время начала предыдущего дня.
-     * Учитывает сдвиг из конфигурации DAY_START, смотри Readme.
+     * Учитывает сдвиг из конфигурации GLS_DAY_START, смотри Readme.
      * @returns {moment.Moment} Время как объект moment.js.
      */
     static get lastDayStart() {
@@ -37,7 +37,7 @@ class Moments {
 
     /**
      * Время в миллисекундах, которое осталось до начала следующего дня.
-     * Учитывает сдвиг из конфигурации DAY_START, смотри Readme.
+     * Учитывает сдвиг из конфигурации GLS_DAY_START, смотри Readme.
      * @returns {number} Число в миллисекундах.
      */
     static get remainedToNextDay() {
@@ -70,7 +70,7 @@ class Moments {
     }
 
     static get _dayStart() {
-        return env.DAY_START;
+        return env.GLS_DAY_START;
     }
 }
 

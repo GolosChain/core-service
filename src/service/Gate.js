@@ -87,7 +87,7 @@ class Gate extends BasicService {
         return new Promise((resolve, reject) => {
             this._server = jayson.server(routes).http();
 
-            this._server.listen(env.GATE_LISTEN_PORT, error => {
+            this._server.listen(env.GLS_GATE_LISTEN_PORT, env.GLS_GATE_LISTEN_HOST, error => {
                 if (error) {
                     reject(error);
                 } else {

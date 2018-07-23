@@ -33,7 +33,7 @@ class BlockSubscribe extends BasicService {
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async start(callback) {
-        this._socket = new WebSocket(env.BLOCKCHAIN_NODE_ADDRESS);
+        this._socket = new WebSocket(env.GLS_BLOCKCHAIN_NODE_ADDRESS);
 
         this._makeSocketHandlers(callback);
         this._startSocketWatchDog();
@@ -86,7 +86,7 @@ class BlockSubscribe extends BasicService {
             }
 
             this._alive = false;
-        }, env.BLOCKCHAIN_SUBSCRIBE_TIMEOUT / 2);
+        }, env.GLS_BLOCKCHAIN_SUBSCRIBE_TIMEOUT / 2);
     }
 
     _handleError(error) {
