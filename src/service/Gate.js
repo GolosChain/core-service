@@ -129,7 +129,7 @@ class Gate extends BasicService {
     _handleHandlerError(callback, error) {
         switch (error.code) {
             case 'ECONNREFUSED':
-                callback(errors.E503, null);
+                callback(errors.E503.error, null);
                 break;
             default:
                 callback(error, null);
