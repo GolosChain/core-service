@@ -1,5 +1,6 @@
 const jayson = require('jayson');
 const env = require('../Env');
+const errors = require('../HttpError');
 const BasicService = require('./Basic');
 
 /**
@@ -116,13 +117,23 @@ class Gate extends BasicService {
                         callback(null, data);
                     },
                     error => {
-                        callback(error, null);
+                        this._handleHandlerError(callback, error);
                     }
                 );
             };
         }
 
         return routes;
+    }
+
+    _handleHandlerError(callback, error) {
+        switch (error.code) {
+            case 'ECONNREFUSED':
+                callback(errors.E503, null);
+                break;
+            default:
+                callback(error, null);
+        }
     }
 }
 
