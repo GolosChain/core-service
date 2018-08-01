@@ -1,6 +1,7 @@
 const jayson = require('jayson');
 const env = require('../Env');
 const errors = require('../HttpError');
+const logger = require('../Logger');
 const BasicService = require('./Basic');
 
 /**
@@ -127,6 +128,15 @@ class Gate extends BasicService {
     }
 
     _handleHandlerError(callback, error) {
+        [EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError].forEach(
+            internalErrorType => {
+                if (error instanceof internalErrorType) {
+                    logger.error(`Internal route error - ${error.message} - ${error.stack}`);
+                    process.exit(1);
+                }
+            }
+        );
+
         switch (error.code) {
             case 'ECONNREFUSED':
                 callback(errors.E503.error, null);
