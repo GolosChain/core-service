@@ -115,6 +115,10 @@ class Gate extends BasicService {
             routes[route] = (data, callback) => {
                 originHandler.call(null, data).then(
                     data => {
+                        if (!data || data === 'Ok') {
+                            data = { status: 'OK' };
+                        }
+
                         callback(null, data);
                     },
                     error => {
