@@ -3,6 +3,7 @@ module.exports = {
     Moments: require('./src/Moments'),
     Stats: require('./src/Stats'),
     HttpError: require('./src/HttpError'),
+    Template: require('./src/Template'),
     service: {
         Basic: require('./src/service/Basic'),
         BlockSubscribe: require('./src/service/BlockSubscribe'),
