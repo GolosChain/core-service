@@ -77,11 +77,7 @@ class Gate extends BasicService {
                 if (error) {
                     reject(error);
                 } else {
-                    if (response.error) {
-                        reject(response.error);
-                    } else {
-                        resolve(response.result);
-                    }
+                    resolve(response);
                 }
             });
         });
