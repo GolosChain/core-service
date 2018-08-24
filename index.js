@@ -11,4 +11,7 @@ module.exports = {
         MongoDB: require('./src/service/MongoDB'),
         Gate: require('./src/service/Gate'),
     },
+    utils: {
+        BlockChainValues: require('./src/utils/BlockChainValues'),
+    },
 };
