@@ -1,17 +1,32 @@
 module.exports = {
-    Logger: require('./src/Logger'),
-    Moments: require('./src/Moments'),
-    Stats: require('./src/Stats'),
-    HttpError: require('./src/HttpError'),
-    Template: require('./src/Template'),
+    // Backward capability
+    Logger: require('./src/utils/Logger'),
+    Moments: require('./src/utils/Moments'),
+    Template: require('./src/utils/Template'),
+    HttpError: require('./src/httpError'),
     service: {
-        Basic: require('./src/service/Basic'),
-        BlockSubscribe: require('./src/service/BlockSubscribe'),
-        BlockSubscribeRestore: require('./src/service/BlockSubscribeRestore'),
-        MongoDB: require('./src/service/MongoDB'),
-        Gate: require('./src/service/Gate'),
+        Basic: require('./src/services/Basic'),
+        BlockSubscribe: require('./src/services/BlockSubscribe'),
+        BlockSubscribeRestore: require('./src/services/BlockSubscribeRestore'),
+        MongoDB: require('./src/services/MongoDB'),
+        Gate: require('./src/services/Gate'),
+    },
+
+    Stats: require('./src/Stats'),
+    statsClient: require('./src/Stats').client,
+    httpError: require('./src/httpError'),
+    defaultStarter: require('./src/defaultStarter'),
+    services: {
+        Basic: require('./src/services/Basic'),
+        BlockSubscribe: require('./src/services/BlockSubscribe'),
+        BlockSubscribeRestore: require('./src/services/BlockSubscribeRestore'),
+        MongoDB: require('./src/services/MongoDB'),
+        Gate: require('./src/services/Gate'),
     },
     utils: {
         BlockChainValues: require('./src/utils/BlockChainValues'),
+        Logger: require('./src/utils/Logger'),
+        Moments: require('./src/utils/Moments'),
+        Template: require('./src/utils/Template'),
     },
 };

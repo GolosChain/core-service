@@ -1,6 +1,6 @@
 const EventEmitter = require('events');
-const logger = require('../Logger');
-const env = require('../Env');
+const logger = require('../utils/Logger');
+const env = require('../env');
 
 /**
  * Базовый сервис, выступающий в роле абстрактного сервиса с частью уже

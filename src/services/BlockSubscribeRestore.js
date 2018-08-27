@@ -1,6 +1,6 @@
 const golos = require('golos-js');
 const stats = require('../Stats').client;
-const logger = require('../Logger');
+const logger = require('../utils/Logger');
 const BasicService = require('./Basic');
 
 /**

@@ -1,8 +1,8 @@
 const WebSocket = require('ws');
-const env = require('../Env');
-const logger = require('../Logger');
+const env = require('../env');
+const logger = require('../utils/Logger');
 const stats = require('../Stats').client;
-const BasicService = require('../service/Basic');
+const BasicService = require('./Basic');
 
 // TODO remove after golos-js implement this methods
 const MAGIC_SUBSCRIBE_CALL =

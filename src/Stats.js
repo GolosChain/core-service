@@ -1,6 +1,6 @@
 const StatsDClient = require('node-statsd');
-const env = require('./Env');
-const logger = require('./Logger');
+const env = require('./env');
+const logger = require('./utils/Logger');
 
 /**
  * Класс-обертка для StatsD (получение статуса о работоспособности сервиса).

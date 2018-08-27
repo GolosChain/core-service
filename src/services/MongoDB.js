@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
-const env = require('../Env');
-const logger = require('../Logger');
-const BasicService = require('../service/Basic');
+const env = require('../env');
+const logger = require('../utils/Logger');
+const BasicService = require('./Basic');
 const stats = require('../Stats').client;
 
 /**
