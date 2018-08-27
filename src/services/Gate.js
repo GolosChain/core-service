@@ -1,6 +1,6 @@
 const jayson = require('jayson');
 const env = require('../env');
-const errors = require('../HttpError');
+const errors = require('../httpError');
 const logger = require('../utils/Logger');
 const BasicService = require('./Basic');
 
