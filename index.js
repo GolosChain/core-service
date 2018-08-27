@@ -18,6 +18,7 @@ module.exports = {
     defaultStarter: require('./src/defaultStarter'),
     services: {
         Basic: require('./src/services/Basic'),
+        BasicMain: require('./src/services/BasicMain'),
         BlockSubscribe: require('./src/services/BlockSubscribe'),
         BlockSubscribeRestore: require('./src/services/BlockSubscribeRestore'),
         MongoDB: require('./src/services/MongoDB'),
