@@ -18,7 +18,22 @@ class BlockSubscribe extends BasicService {
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async start(callback) {
-        golos.api.setBlockAppliedCallback('full', callback);
+        golos.api.setBlockAppliedCallback('full', (error, data) => {
+            if (error) {
+                throw error;
+            }
+
+            const blockNum = this._extractBlockNum(data);
+
+            callback(data, blockNum);
+        });
+    }
+
+    _extractBlockNum(data) {
+        const previousHash = data.previous;
+        const previousBlockNum = parseInt(previousHash.slice(0, 8), 16);
+
+        return previousBlockNum + 1;
     }
 }
 
