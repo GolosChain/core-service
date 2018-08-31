@@ -6,6 +6,7 @@ module.exports = {
     E403: [403, 'Forbidden'],
     E404: [404, 'Not Found'],
     E406: [406, 'Not Acceptable'],
+    E409: [409, 'Conflict'],
     E500: [500, 'Internal Server Error'],
     E503: [503, 'Service Unavailable'],
 };
