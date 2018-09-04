@@ -24,6 +24,7 @@ class Template {
      * Предполагается что вложенные объекты являются объектами
      * или поддерживают Object.keys(inner).
      * @param {Object} object Целевой объект.
+     * @return {Object} object Целевой объект.
      */
     static makeFor(object) {
         for (let key of Object.keys(object)) {
@@ -33,6 +34,8 @@ class Template {
                 this.makeFor(object[key]);
             }
         }
+        
+        return object;
     }
 }
 
