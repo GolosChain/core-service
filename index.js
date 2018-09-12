@@ -9,7 +9,7 @@ module.exports = {
         BlockSubscribe: require('./src/services/BlockSubscribe'),
         BlockSubscribeRestore: require('./src/services/BlockSubscribeRestore'),
         MongoDB: require('./src/services/MongoDB'),
-        Gate: require('./src/services/Gate'),
+        Gate: require('./src/services/Connector'),
     },
 
     Stats: require('./src/Stats'),
@@ -22,7 +22,10 @@ module.exports = {
         BlockSubscribe: require('./src/services/BlockSubscribe'),
         BlockSubscribeRestore: require('./src/services/BlockSubscribeRestore'),
         MongoDB: require('./src/services/MongoDB'),
-        Gate: require('./src/services/Gate'),
+        Connector: require('./src/services/Connector'),
+
+        // Backward capability
+        Gate: require('./src/services/Connector'),
     },
     utils: {
         BlockChainValues: require('./src/utils/BlockChainValues'),

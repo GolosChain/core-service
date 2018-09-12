@@ -29,7 +29,7 @@ const BasicService = require('./Basic');
  *
  * Ключ является алиасом для отправки последующих запросов через метод sendTo.
  */
-class Gate extends BasicService {
+class Connector extends BasicService {
     constructor() {
         super();
 
@@ -151,4 +151,4 @@ class Gate extends BasicService {
     }
 }
 
-module.exports = Gate;
+module.exports = Connector;
