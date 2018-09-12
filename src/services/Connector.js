@@ -89,7 +89,7 @@ class Connector extends BasicService {
         return new Promise((resolve, reject) => {
             this._server = jayson.server(routes).http();
 
-            this._server.listen(env.GLS_GATE_PORT, env.GLS_GATE_HOST, error => {
+            this._server.listen(env.GLS_CONNECTOR_PORT, env.GLS_CONNECTOR_HOST, error => {
                 if (error) {
                     reject(error);
                 } else {

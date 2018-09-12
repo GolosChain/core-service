@@ -8,6 +8,10 @@ module.exports = {
     GLS_BLOCKCHAIN_CONNECT: env.GLS_BLOCKCHAIN_CONNECT || 'wss://ws.golos.io',
     GLS_METRICS_HOST: env.GLS_METRICS_HOST || '127.0.0.1',
     GLS_METRICS_PORT: env.GLS_METRICS_PORT || 8125,
+    GLS_CONNECTOR_HOST: env.GLS_CONNECTOR_HOST || env.GLS_GATE_HOST || '127.0.0.1',
+    GLS_CONNECTOR_PORT: env.GLS_CONNECTOR_PORT || env.GLS_GATE_PORT || 8080,
+
+    // Backward capability
     GLS_GATE_HOST: env.GLS_GATE_HOST || '127.0.0.1',
     GLS_GATE_PORT: env.GLS_GATE_PORT || 8080,
 };
