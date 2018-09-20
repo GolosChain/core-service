@@ -11,10 +11,17 @@ const Basic = require('./Basic');
  * (смотри addNested). Единственным нюансом
  * является необходимость отправки в конструктор
  * этого базового класса клиента StatsD.
+ * Дополнительно можно отправить env-объект для
+ * автоматической печати переменных env в консоль.
  */
 class BasicMain extends Basic {
-    constructor(stats) {
+    constructor(stats, env = null) {
         super();
+
+        if (env) {
+            this.printEnvBasedConfig(env);
+        }
+
         this._stats = stats;
         this.stopOnExit();
     }
