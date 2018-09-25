@@ -12,10 +12,11 @@ module.exports = {
         Logger: require('./src/utils/Logger'),
         Moments: require('./src/utils/Moments'),
         Template: require('./src/utils/Template'),
+        RpcObject: require('./src/utils/RpcObject'),
         statsClient: require('./src/utils/statsClient'),
         defaultStarter: require('./src/utils/defaultStarter'),
     },
     data: {
-        httpError: require('./src/data/httpError'),
-    }
+        env: require('./src/data/env'),
+    },
 };
