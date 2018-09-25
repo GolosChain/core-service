@@ -1,3 +1,6 @@
+// @deprecated
+// "httpError" module may removed in version 3.0 or early
+
 const jayson = require('jayson');
 
 module.exports = {

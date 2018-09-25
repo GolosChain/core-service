@@ -1,5 +1,5 @@
 const moment = require('moment');
-const env = require('../env');
+const env = require('../data/env');
 
 /**
  * Утилита для типичных временных сущностей.
