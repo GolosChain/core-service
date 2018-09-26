@@ -1,5 +1,6 @@
 const BasicService = require('./Basic');
 const golos = require('golos-js');
+const Block = require('../utils/Block');
 
 /**
  * Сервис подписки получения новых блоков.
@@ -23,17 +24,10 @@ class BlockSubscribe extends BasicService {
                 throw error;
             }
 
-            const blockNum = this._extractBlockNum(data);
+            const blockNum = Block.extractBlockNum(data);
 
             callback(data, blockNum);
         });
-    }
-
-    _extractBlockNum(data) {
-        const previousHash = data.previous;
-        const previousBlockNum = parseInt(previousHash.slice(0, 8), 16);
-
-        return previousBlockNum + 1;
     }
 }
 

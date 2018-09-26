@@ -1,25 +1,60 @@
+/**
+ * Утилита для работы с данными блока блокчейна.
+ */
 class Block {
-    static eachRealOperation(block, fn) {
-        for (let operation of this.eachRealOperationGen()) {
-            fn(operation);
-        }
+    /**
+     * Извлекает номер блока из данных блока.
+     * @param {Object} block Целевой блок.
+     * @return {number} Номер блока.
+     */
+    static extractBlockNum(block) {
+        const previousHash = block.previous;
+        const previousBlockNum = parseInt(previousHash.slice(0, 8), 16);
+
+        return previousBlockNum + 1;
     }
 
-    static *eachRealOperationGen(block) {
+    /**
+     * Итерируется по транзакциям в блоке.
+     * @param {Object} block Блок.
+     * @return {IterableIterator<Object>} Итератор.
+     */
+    static *eachTransaction(block) {
         for (let transaction of block.transactions) {
-            for (let operation of transaction.operations) {
-                yield operation;
-            }
+            yield transaction;
         }
     }
 
-    static eachVirtualOperation(block, fn) {
-        for (let operation of this.eachVirtualOperationGen(block)) {
-            fn(operation);
+    /**
+     * Итерируется по "реальным" операциям внтури блока.
+     * В итерацию попадают операции из транзакций в блокчейне.
+     * @param {Object} block Блок.
+     * @return {IterableIterator<Object>} Итератор.
+     */
+    static *eachRealOperation(block) {
+        for (let operation of this.eachTransaction(block)) {
+            yield operation;
         }
     }
 
-    static *eachVirtualOperationGen(block) {
+    /**
+     * Аналог "eachRealOperation", но возвращает результат в колбек.
+     * @param {Object} block Блок.
+     * @param {Function} callback Колбек.
+     */
+    static eachRealOperationCb(block, callback) {
+        for (let operation of this.eachRealOperationGen()) {
+            callback(operation);
+        }
+    }
+
+    /**
+     * Итерируется по "виртуальным" операциям внутри блока.
+     * В итерацию попадают не явные операции, исполняемые на блокчейн-ноде.
+     * @param {Object} block Блок.
+     * @return {IterableIterator<Object>} Итератор.
+     */
+    static *eachVirtualOperation(block) {
         if (!block._virtual_operations) {
             return;
         }
@@ -33,6 +68,17 @@ class Block {
 
                 yield [type, data];
             }
+        }
+    }
+
+    /**
+     * Аналог "eachVirtualOperation", но возвращает результат в колбек.
+     * @param {Object} block Блок.
+     * @param {Function} callback Колбек.
+     */
+    static eachVirtualOperationCb(block, callback) {
+        for (let operation of this.eachVirtualOperationGen(block)) {
+            callback(operation);
         }
     }
 }
