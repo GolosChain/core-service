@@ -65,7 +65,8 @@ class BlockSubscribe extends BasicService {
 
         this.on('readyToNotify', () => {
             this._runNotifier().catch(error => {
-                throw error;
+                Logger.error(`BlockSubscribe - notifier error ${error}`);
+                process.exit(1);
             });
         });
 
@@ -89,7 +90,7 @@ class BlockSubscribe extends BasicService {
 
             const blockNum = BlockUtils.extractBlockNum(block);
 
-            this._blockQueue.push({ block, blockNum });
+            this._blockQueue.push([block, blockNum, false]);
 
             stats.timing('block_subscribe_get_block', new Date() - timer);
 
@@ -111,8 +112,6 @@ class BlockSubscribe extends BasicService {
             return;
         }
 
-        Logger.info('BlockSubscribe - restore blocks...');
-
         if (blockNum === this._lastBlockNum) {
             this._blockQueue.shift();
             this.emit('readyToNotify');
@@ -122,15 +121,10 @@ class BlockSubscribe extends BasicService {
         let currentBlock = blockNum;
 
         while (--currentBlock > this._lastBlockNum) {
-            const block = await this._getBlock(currentBlock);
-
-            Logger.info(`BlockSubscribe - restore block ${currentBlock}`);
-
-            this._blockQueue.unshift({ block, blockNum: currentBlock });
+            this._blockQueue.unshift(currentBlock);
         }
 
-        Logger.info('BlockSubscribe - restore blocks done!');
-
+        Logger.info('BlockSubscribe - ready to start notify!');
         this.emit('readyToNotify');
     }
 
@@ -145,7 +139,7 @@ class BlockSubscribe extends BasicService {
     async _runNotifier() {
         while (true) {
             if (!this._notifierPaused) {
-                this._notify();
+                await this._notify();
             }
             await new Promise(resolve => {
                 setImmediate(resolve);
@@ -153,16 +147,26 @@ class BlockSubscribe extends BasicService {
         }
     }
 
-    _notify() {
+    async _notify() {
+        let item;
         let blockData;
 
-        while ((blockData = this._blockQueue.shift())) {
-            const { block, blockNum, forkRewrite } = blockData;
+        while ((item = this._blockQueue.shift())) {
+            if (typeof item === 'number') {
+                const block = await this._getBlock(item);
+                const blockNum = BlockUtils.extractBlockNum(block);
 
-            this.emit('block', block, blockNum, forkRewrite);
+                Logger.info(`BlockSubscribe - restore block ${item}`);
+
+                blockData = [block, blockNum, false];
+            } else {
+                blockData = [...item];
+            }
+
+            this.emit('block', ...blockData);
 
             if (this._callback) {
-                this._callback(block, blockNum, forkRewrite);
+                this._callback(...blockData);
             }
         }
     }
