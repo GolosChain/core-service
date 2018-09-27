@@ -71,7 +71,8 @@ class BlockSubscribe extends BasicService {
 
         this.on('firstBlockGet', blockNum => {
             this._runBootRestore(blockNum).catch(error => {
-                throw error;
+                Logger.error(`Cant handle first block - ${error}`);
+                process.exit(1);
             });
             this._runForkRestore();
         });
@@ -82,7 +83,8 @@ class BlockSubscribe extends BasicService {
             const timer = new Date();
 
             if (error) {
-                throw error;
+                Logger.error(`Block subscribe error - ${error}`);
+                process.exit(1);
             }
 
             const blockNum = BlockUtils.extractBlockNum(block);
@@ -103,7 +105,7 @@ class BlockSubscribe extends BasicService {
     }
 
     async _runBootRestore(blockNum) {
-        if (!this._lastBlockNum) {
+        if (typeof this._lastBlockNum !== 'number') {
             Logger.log('BlockSubscribe - last block num not defined, skip boot restore.');
             this.emit('readyToNotify');
             return;
