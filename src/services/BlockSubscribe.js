@@ -1,32 +1,47 @@
 const BasicService = require('./Basic');
 const golos = require('golos-js');
-const Block = require('../utils/Block');
+const BlockUtils = require('../utils/Block');
 
+// TODO Make 'fork' event
 /**
  * Сервис подписки получения новых блоков.
- * Подписывается на рассылку блоков от golos-ноды, адрес которой определяется
- * переменной окружения. Каждый полученный блок сериализует и передает
- * в указанный callback. Имеет встроенную систему выброса ошибки по таймауту.
+ * Подписывается на рассылку блоков от golos-ноды.
+ * Каждый полученный блок сериализует и передает в эвенте
+ * 'block', а в случае форка вызывается эвент 'fork'.
+ * Альтернативно для получения данных блока можно
+ * использовать callback-функцию.
  */
 class BlockSubscribe extends BasicService {
+    /**
+     * Вызывается в случае получения нового блока из блокчейна.
+     * @event block
+     * @property {Object} block Блок данных.
+     * @property {number} blockNum Номер блока.
+     */
 
     /**
-     * Запуск, подписывается на новые блоки указанной golos-ноды
-     * и переправляет все данные в сериализованном виде в указанный
-     * callback.
-     * @param {Function} callback Функция, которая будет получать данные
-     * каждого нового блока. Первым аргументом идет блок, вторым - его номер.
+     * Вызывается в случае обнаружения форка, оповещает о номере блока,
+     * с которого начинаются расхождения.
+     * @event fork
+     * @property {number} blockNum Номер блока.
+     */
+
+    /**
+     * Запуск.
+     * @param {Function} callback Альтернтативный способ получения данных блока,
+     * повторяет апи эвента 'block'.
      * @returns {Promise<void>} Промис без экстра данных.
      */
-    async start(callback) {
-        golos.api.setBlockAppliedCallback('full', (error, data) => {
+    async start(callback = null) {
+        golos.api.setBlockAppliedCallback('full', (error, block) => {
             if (error) {
                 throw error;
             }
 
-            const blockNum = Block.extractBlockNum(data);
+            const blockNum = BlockUtils.extractBlockNum(block);
 
-            callback(data, blockNum);
+            this.emit('block', block, blockNum);
+            callback(block, blockNum);
         });
     }
 }
