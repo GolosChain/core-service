@@ -8,6 +8,7 @@ module.exports = {
         Connector: require('./src/services/Connector'),
     },
     utils: {
+        Block: require('./src/utils/Block'),
         BlockChainValues: require('./src/utils/BlockChainValues'),
         Logger: require('./src/utils/Logger'),
         Moments: require('./src/utils/Moments'),
