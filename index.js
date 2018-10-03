@@ -1,4 +1,7 @@
 module.exports = {
+    controllers: {
+        Basic: require('./src/controllers/Basic'),
+    },
     services: {
         Basic: require('./src/services/Basic'),
         BasicMain: require('./src/services/BasicMain'),
