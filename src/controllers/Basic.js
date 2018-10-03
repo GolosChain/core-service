@@ -18,9 +18,13 @@ class Basic {
      */
     constructor({ connector }) {
         if (connector) {
-            this._connector = connector;
+            this.connector = connector;
         }
     }
+
+    /**
+     * @property {Object} connector Создается конструктором, смотри описание.
+     */
 
     /**
      * Базовый метод любого контроллера, являющийся дефолтной входной точкой.
@@ -39,8 +43,8 @@ class Basic {
      * @return {Promise<*>} Ответ.
      */
     async sendTo(...args) {
-        if (this._connector) {
-            return await this._connector.sendTo(...args);
+        if (this.connector) {
+            return await this.connector.sendTo(...args);
         } else {
             Logger.error('Basic controller - connector not defined');
             throw 'Connector not defined';
