@@ -14,7 +14,7 @@ class RpcObject {
      * @param {number/string/null} [id] Идентификатор ответа.
      */
     static success(result, id) {
-        this.response(null, result, id);
+        return this.response(null, result, id);
     }
 
     /**
@@ -48,7 +48,7 @@ class RpcObject {
      * @param {number/string/null} [id] Идентификатор ответа.
      */
     static response(error, result, id) {
-        jayson.utils.response(error, result, id);
+        return jayson.utils.response(error, result, id);
     }
 
     /**
@@ -58,7 +58,7 @@ class RpcObject {
      * @param {number/string/null} [id] Идентификатор запроса.
      */
     static request(method, data, id) {
-        jayson.utils.request(method, data, id);
+        return jayson.utils.request(method, data, id);
     }
 }
 
