@@ -238,12 +238,22 @@ class Basic {
 
     /**
      * Трансляция эвентов целевого объекта через себя.
-     * @param {Object} from Эмиттер, эвенты которого необходимо транслировать.
-     * @param {...string/Symbol} events Список эвентов.
+     * @param {Object/Object[]} from Эмиттер, эвенты которого необходимо транслировать.
+     * @param {...string/string/string[]} events Список эвентов.
      */
     translateEmit(from, ...events) {
-        for (let event of events) {
-            from.on(event, (...args) => this.emit(event, ...args));
+        if (!Array.isArray(from)) {
+            from = [from];
+        }
+
+        if (Array.isArray(events[0])) {
+            events = events[0];
+        }
+
+        for (let target of from) {
+            for (let event of events) {
+                target.on(event, (...args) => this.emit(event, ...args));
+            }
         }
     }
 
