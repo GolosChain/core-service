@@ -1,6 +1,5 @@
 const jayson = require('jayson');
 const env = require('../data/env');
-const errors = require('../data/httpError');
 const logger = require('../utils/Logger');
 const BasicService = require('./Basic');
 
@@ -68,8 +67,8 @@ class Connector extends BasicService {
      * Оправка данных указанному микросервису.
      * @param {string} service Имя-алиас микросервиса.
      * @param {string} method Метод JSON-RPC.
-     * @param {any} data Любые данные.
-     * @returns {Promise<any>} Данные ответа либо ошибка.
+     * @param {*} data Любые данные.
+     * @returns {Promise<*>} Данные ответа либо ошибка.
      */
     sendTo(service, method, data) {
         return new Promise((resolve, reject) => {
@@ -143,7 +142,7 @@ class Connector extends BasicService {
 
         switch (error.code) {
             case 'ECONNREFUSED':
-                callback(errors.E503.error, null);
+                callback({ code: 1001, message: 'Internal server error' }, null);
                 break;
             default:
                 callback(error, null);
