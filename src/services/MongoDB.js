@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
-const env = require('../env');
+const env = require('../data/env');
 const logger = require('../utils/Logger');
 const BasicService = require('./Basic');
-const stats = require('../Stats').client;
+const stats = require('../utils/statsClient');
 
 /**
  * Сервис взаимодействия с базой данных MongoDB.
