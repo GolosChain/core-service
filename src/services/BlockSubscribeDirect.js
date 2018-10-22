@@ -4,7 +4,7 @@ const stats = require('../utils/statsClient');
 const BasicService = require('./Basic');
 
 const MAGIC_SUBSCRIBE_CALL =
-    '{"id":1,"jsonrpc":"2.0","method":"call","params":["database_api","set_block_applied_callback",[0]]}';
+    '{"id":1,"jsonrpc":"2.0","method":"call","params":["database_api","set_block_applied_callback",["full"]]}';
 
 const BLOCKCHAIN_CONNECT = 'wss://ws.golos.io';
 const BLOCKCHAIN_SUBSCRIBE_TIMEOUT = 60000;
