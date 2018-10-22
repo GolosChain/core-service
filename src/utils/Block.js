@@ -32,8 +32,10 @@ class Block {
      * @return {IterableIterator<Object>} Итератор.
      */
     static *eachRealOperation(block) {
-        for (let operation of this.eachTransaction(block)) {
-            yield operation;
+        for (let transaction of this.eachTransaction(block)) {
+            for (let [type, data] of transaction.operations) {
+                yield [type, data];
+            }
         }
     }
 
