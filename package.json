@@ -1,6 +1,6 @@
 {
     "name": "gls-core-service",
-    "version": "2.4.0",
+    "version": "2.4.1",
     "description": "",
     "main": "index.js",
     "scripts": {
@@ -25,11 +25,11 @@
     "dependencies": {
         "bignumber.js": "^7.2.1",
         "colors": "^1.3.2",
-        "golos-js": "^0.7.4",
-        "jayson": "^2.0.6",
+        "golos-js": "^0.7.5",
+        "jayson": "^2.1.0",
         "lodash.template": "^4.4.0",
         "moment": "^2.22.2",
-        "mongoose": "^5.3.1",
+        "mongoose": "^5.3.7",
         "node-statsd": "^0.1.1",
         "ws": "^5.2.2"
     }
