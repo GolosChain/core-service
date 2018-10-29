@@ -116,7 +116,13 @@ class BigNum {
                 convertedArgs.push(this._convertValue(raw));
             }
 
-            return new BigNum(target[property].apply(this._value, convertedArgs));
+            const result = target[property].apply(this._value, convertedArgs);
+
+            if (result instanceof BN) {
+                return new BigNum(BN);
+            }
+
+            return result;
         };
     }
 }
