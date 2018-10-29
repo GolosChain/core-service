@@ -3,14 +3,12 @@ const BN = require('bignumber.js');
 /**
  * Обертка над библиотекой bignumber.js.
  * В отличии от оригинала использует более гибкий
- * конструктор, который позволяет передать аргументом
- * сущность в виде значение и постфиксом размерности,
- * например '1000 GBG' будет адекватно конвертированно
- * в 1000, обернутое в объект bignumber.js.
- *
- * Также оборачивает арифметические методы и методы сравнения
- * для инстанса bignumber.js, создавая возможность использовать
- * значения с постфиксами в качестве аргументов.
+ * конструктор и вызовы арифметических методов,
+ * позволяя передавать не поддерживаемые в оригинале
+ * числоподобные значения, например содержащие постфикс
+ * вида '1000 gbg'. Использование parseFloat искажает
+ * оригинальное значение для очень больних чисел,
+ * но эта обертка позволяет работать с ними без потерь.
  */
 class BigNum {
     /**
@@ -21,6 +19,12 @@ class BigNum {
         return BN;
     }
 
+    /**
+     * Конструктор, возвращающий прокси над bignumber.js.
+     * @param {number|string|BigInt|BN} value Любое числоподобное
+     * значение, включая значения с префиксами и постфиксами.
+     * @return {Proxy} Прокси.
+     */
     constructor(value) {
         this._value = this._convertValue(value);
 
@@ -53,6 +57,8 @@ class BigNum {
                     case 'squareRoot':
                     case 'sqrt':
                         return this._makeCallWrapper(target, property);
+                    case 'rawValue':
+                        return this.rawValue.bind(this);
                     default:
                         return target[property];
                 }
@@ -77,12 +83,25 @@ class BigNum {
         }
 
         if (typeof value === 'string') {
-            const assetNum = value.split(' ')[0];
+            value = value.trim();
 
-            if (isNaN(+assetNum)) {
-                return new BN(value);
+            const original = new BN(value);
+
+            if (!original.isNaN()) {
+                return original;
+            }
+
+            const hex = '0x\\d+|-0x\\d+';
+            const octal = '0o\\d+|-0o\\d+';
+            const binary = '0b\\d+|-0b\\d+';
+            const decimal = '\\d+|-\\d+';
+            const check = [hex, octal, binary, decimal].join('|');
+            const matched = value.match(new RegExp(check));
+
+            if (matched) {
+                return new BN(matched[0]);
             } else {
-                return new BN(assetNum);
+                return original;
             }
         }
 
@@ -97,7 +116,7 @@ class BigNum {
                 convertedArgs.push(this._convertValue(raw));
             }
 
-            return target[property].apply(this._value, convertedArgs);
+            return new BigNum(target[property].apply(this._value, convertedArgs));
         };
     }
 }
