@@ -1,4 +1,5 @@
 const golos = require('golos-js');
+const BigNum = require('BigNum');
 
 /**
  * Класс утилит работы со значениями из блокчейна.
@@ -14,12 +15,14 @@ class BlockChainValues {
      * @returns {number} Результирующие значение.
      */
     static golosToVests(golos, globalProperties) {
-        const { total_vesting_fund_steem, total_vesting_shares } = globalProperties;
-        const totalVestingFundSteem = parseFloat(total_vesting_fund_steem);
-        const totalVestingShares = parseFloat(total_vesting_shares);
-        const vests = golos / (totalVestingFundSteem / totalVestingShares);
+        golos = new BigNum(golos);
 
-        return +vests.toFixed(6);
+        const { total_vesting_fund_steem, total_vesting_shares } = globalProperties;
+        const totalVestingFundSteem = new BigNum(total_vesting_fund_steem);
+        const totalVestingShares = new BigNum(total_vesting_shares);
+        const vests = golos.div(totalVestingFundSteem.div(totalVestingShares));
+
+        return vests.dp(6);
     }
 
     /**
@@ -32,12 +35,14 @@ class BlockChainValues {
      * @returns {number} Результирующие значение.
      */
     static vestsToGolos(vests, globalProperties) {
-        const { total_vesting_fund_steem, total_vesting_shares } = globalProperties;
-        const totalVestingFundSteem = parseFloat(total_vesting_fund_steem);
-        const totalVestingShares = parseFloat(total_vesting_shares);
-        const golos = totalVestingFundSteem * (vests / totalVestingShares);
+        vests = new BigNum(vests);
 
-        return +golos.toFixed(3);
+        const { total_vesting_fund_steem, total_vesting_shares } = globalProperties;
+        const totalVestingFundSteem = new BigNum(total_vesting_fund_steem);
+        const totalVestingShares = new BigNum(total_vesting_shares);
+        const golos = totalVestingFundSteem.times(vests.div(totalVestingShares));
+
+        return golos.dp(3);
     }
 
     /**
