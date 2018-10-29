@@ -1,5 +1,5 @@
 const golos = require('golos-js');
-const BigNum = require('BigNum');
+const BigNum = require('./BigNum');
 
 /**
  * Класс утилит работы со значениями из блокчейна.
