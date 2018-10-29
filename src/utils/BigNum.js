@@ -119,7 +119,7 @@ class BigNum {
             const result = target[property].apply(this._value, convertedArgs);
 
             if (result instanceof BN) {
-                return new BigNum(BN);
+                return new BigNum(result);
             }
 
             return result;
