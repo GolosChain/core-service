@@ -4,7 +4,7 @@
  */
 
 const mongoose = require('mongoose');
-const BigNumber = require('./BigNum');
+const BigNum = require('./BigNum');
 
 // Этот вызов автоматически подключает оригинальный тип.
 const BigNumberSchema = require('mongoose-bignumber');
@@ -17,5 +17,5 @@ const BigNumberSchema = require('mongoose-bignumber');
 mongoose.Types.BigNumber.constructor = function(...args) {
     const original = mongoose.Types.BigNumber.constructor.apply(this, args);
 
-    return new BigNumber(original);
+    return new BigNum(original);
 };
