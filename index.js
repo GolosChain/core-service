@@ -20,7 +20,9 @@ module.exports = {
         RpcObject: require('./src/utils/RpcObject'),
         statsClient: require('./src/utils/statsClient'),
         defaultStarter: require('./src/utils/defaultStarter'),
-        BigNum: require('./src/utils/BigNum'),
+    },
+    types: {
+        BigNum: require('./src/types/BigNum'),
     },
     data: {
         env: require('./src/data/env'),
