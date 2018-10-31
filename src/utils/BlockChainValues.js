@@ -17,9 +17,14 @@ class BlockChainValues {
     static golosToVests(golos, globalProperties) {
         golos = new BigNum(golos);
 
-        const { total_vesting_fund_steem, total_vesting_shares } = globalProperties;
-        const totalVestingFundSteem = new BigNum(total_vesting_fund_steem);
-        const totalVestingShares = new BigNum(total_vesting_shares);
+        let totalVestingFundSteem =
+            globalProperties.totalVestingFundGolos ||
+            new BigNum(globalProperties.total_vesting_fund_steem) ||
+            new BigNum(0);
+        const totalVestingShares =
+            globalProperties.totalVestingShares ||
+            new BigNum(globalProperties.total_vesting_shares) ||
+            new BigNum(0);
         const vests = golos.div(totalVestingFundSteem.div(totalVestingShares));
 
         return vests.dp(6);
@@ -37,9 +42,14 @@ class BlockChainValues {
     static vestsToGolos(vests, globalProperties) {
         vests = new BigNum(vests);
 
-        const { total_vesting_fund_steem, total_vesting_shares } = globalProperties;
-        const totalVestingFundSteem = new BigNum(total_vesting_fund_steem);
-        const totalVestingShares = new BigNum(total_vesting_shares);
+        const totalVestingFundSteem =
+            globalProperties.totalVestingFundGolos ||
+            new BigNum(globalProperties.total_vesting_fund_steem) ||
+            new BigNum(0);
+        const totalVestingShares =
+            globalProperties.totalVestingShares ||
+            new BigNum(globalProperties.total_vesting_shares) ||
+            new BigNum(0);
         const golos = totalVestingFundSteem.times(vests.div(totalVestingShares));
 
         return golos.dp(3);
