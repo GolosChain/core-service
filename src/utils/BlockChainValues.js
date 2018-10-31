@@ -62,6 +62,14 @@ class BlockChainValues {
     static async getDynamicGlobalProperties() {
         return await golos.api.getDynamicGlobalPropertiesAsync();
     }
+
+    /**
+     * Данные по медианной исторической цене на данный момент.
+     * @returns {Promise<Object>} Сырой объект из блокчейна.
+     */
+    static async getCurrentMedianHistoryPrice() {
+        return await golos.api.getCurrentMedianHistoryPriceAsync();
+    }
 }
 
 module.exports = BlockChainValues;
