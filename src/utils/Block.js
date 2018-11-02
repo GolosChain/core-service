@@ -3,6 +3,15 @@
  */
 class Block {
     /**
+     * Получение блока по указанному номеру.
+     * @param {Number} blockNum Номер блока.
+     * @return {Object} Блок в сыром виде.
+     */
+    static async getByNum(blockNum) {
+        return await golos.api.getBlockAsync(blockNum);
+    }
+
+    /**
      * Извлекает номер блока из данных блока.
      * @param {Object} block Целевой блок.
      * @return {number} Номер блока.
