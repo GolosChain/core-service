@@ -5,10 +5,10 @@ const BigNum = require('./BigNum');
  * Добавляет возможность использовать BigNum для хранения данных в MongoDB.
  * Подключение типа происходит автоматически при подключении этого файла.
  */
-class MongoBigNumSchema extends mongoose.SchemaType {
+class MongoBigNum extends mongoose.SchemaType {
     cast(value) {
         return new BigNum(value);
     }
 }
 
-mongoose.Schema.Types.MongoBigNum = MongoBigNumSchema;
+mongoose.Schema.Types.MongoBigNum = MongoBigNum;
