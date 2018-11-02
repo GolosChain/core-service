@@ -10,7 +10,11 @@ class Block {
      * @return {Object} Блок в сыром виде.
      */
     static async getByNum(blockNum) {
-        return await golos.api.getBlockAsync(blockNum);
+        const block = await golos.api.getBlockAsync(blockNum);
+
+        block._virtual_operations = await golos.api.getOpsInBlockAsync(blockNum, true);
+
+        return block;
     }
 
     /**

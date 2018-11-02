@@ -2,6 +2,7 @@ const golos = require('golos-js');
 const stats = require('../utils/statsClient');
 const logger = require('../utils/Logger');
 const BasicService = require('./Basic');
+const BlockUtils = require('../utils/Block');
 
 /**
  * @deprecated
@@ -112,8 +113,7 @@ class BlockSubscribeRestore extends BasicService {
 
         logger.log(`Restore missed registration for block - ${blockNum}`);
 
-        golos.api
-            .getBlockAsync(blockNum)
+        BlockUtils.getByNum(blockNum)
             .then(data => {
                 stats.timing('block_restore', new Date() - timer);
                 setImmediate(this._sync.bind(this));
