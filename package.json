@@ -29,8 +29,9 @@
         "jayson": "^2.1.0",
         "lodash.template": "^4.4.0",
         "moment": "^2.22.2",
-        "mongoose": "^5.3.8",
+        "mongoose": "^5.3.9",
         "node-statsd": "^0.1.1",
+        "then-sleep": "^1.0.1",
         "ws": "^5.2.2"
     }
 }

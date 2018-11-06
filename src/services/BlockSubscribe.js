@@ -1,8 +1,11 @@
+const sleep = require('then-sleep');
 const BasicService = require('./Basic');
 const golos = require('golos-js');
 const BlockUtils = require('../utils/Block');
+const BlockChainValues = require('../utils/BlockChainValues');
 const Logger = require('../utils/Logger');
 const stats = require('../utils/statsClient');
+const env = require('../data/env');
 
 /**
  * Сервис подписки получения новых блоков.
@@ -13,7 +16,7 @@ const stats = require('../utils/statsClient');
  * использовать callback-функцию.
  */
 class BlockSubscribe extends BasicService {
-    constructor(lastBlockNum, resendOnFork) {
+    constructor(lastBlockNum, resendOnFork = true) {
         super();
 
         this._lastBlockNum = lastBlockNum;
@@ -23,6 +26,8 @@ class BlockSubscribe extends BasicService {
         this._blockQueue = [];
         this._firstBlockNum = null;
         this._notifierPaused = false;
+
+        this._irreversibleNum = null;
     }
 
     /**
@@ -61,6 +66,7 @@ class BlockSubscribe extends BasicService {
     async start(callback = null) {
         this._callback = callback;
 
+        await this._runIrreversibleUpdateLoop();
         this._runSubscribe();
 
         this.on('readyToNotify', () => {
@@ -130,6 +136,36 @@ class BlockSubscribe extends BasicService {
 
     async _getBlock(blockNum) {
         return await BlockUtils.getByNum(blockNum);
+    }
+
+    async _runIrreversibleUpdateLoop() {
+        try {
+            await this._updateIrreversibleBlockNum();
+        } catch (error) {
+            Logger.error(`Cant load irreversible num, but continue - ${error}`);
+            await sleep(1000);
+            await this._runIrreversibleUpdateLoop();
+            return;
+        }
+
+        setInterval(async () => {
+            try {
+                await this._updateIrreversibleBlockNum();
+            } catch (error) {
+                Logger.error(`Cant load irreversible num, but skip - ${error}`);
+            }
+        }, env.GLS_IRREVERSIBLE_BLOCK_UPDATE_INTERVAL);
+    }
+
+    async _updateIrreversibleBlockNum() {
+        const props = await BlockChainValues.getDynamicGlobalProperties();
+        const irreversible = props.last_irreversible_block_num;
+
+        if (irreversible && typeof irreversible === 'number') {
+            this._irreversibleNum = irreversible;
+        } else {
+            throw 'Invalid props format';
+        }
     }
 
     _runForkRestore() {
