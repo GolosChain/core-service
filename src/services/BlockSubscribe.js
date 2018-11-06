@@ -1,4 +1,5 @@
 const sleep = require('then-sleep');
+const isEqual = require('lodash.isequal');
 const BasicService = require('./Basic');
 const golos = require('golos-js');
 const BlockUtils = require('../utils/Block');
@@ -16,18 +17,17 @@ const env = require('../data/env');
  * использовать callback-функцию.
  */
 class BlockSubscribe extends BasicService {
-    constructor(lastBlockNum, resendOnFork = true) {
+    constructor(lastBlockNum) {
         super();
 
         this._lastBlockNum = lastBlockNum;
-        this._resendOnFork = resendOnFork;
 
         this._callback = null;
         this._blockQueue = [];
         this._firstBlockNum = null;
-        this._notifierPaused = false;
 
-        this._irreversibleNum = null;
+        this._irreversibleBlockNum = null;
+        this._previousBlockBody = null;
     }
 
     /**
@@ -35,14 +35,14 @@ class BlockSubscribe extends BasicService {
      * @event block
      * @property {Object} block Блок данных.
      * @property {number} blockNum Номер блока.
-     * @property {boolean} forkRewrite Флаг факта повторной отправки блока в связи с форком.
      */
 
     /**
      * Вызывается в случае обнаружения форка, оповещает о номере блока,
      * с которого начинаются расхождения.
+     * После этого эвента подписчик прекращает свою работу.
      * @event fork
-     * @property {number} blockNum Номер блока.
+     * @property {number} irreversibleBlockNum Номер гарантированного неоткатного блока.
      */
 
     /**
@@ -81,7 +81,6 @@ class BlockSubscribe extends BasicService {
                 Logger.error(`Cant handle first block - ${error}`);
                 process.exit(1);
             });
-            this._runForkRestore();
         });
     }
 
@@ -96,7 +95,7 @@ class BlockSubscribe extends BasicService {
 
             const blockNum = BlockUtils.extractBlockNum(block);
 
-            this._blockQueue.push([block, blockNum, false]);
+            this._blockQueue.push([block, blockNum]);
 
             stats.timing('block_subscribe_get_block', new Date() - timer);
 
@@ -162,48 +161,69 @@ class BlockSubscribe extends BasicService {
         const irreversible = props.last_irreversible_block_num;
 
         if (irreversible && typeof irreversible === 'number') {
-            this._irreversibleNum = irreversible;
+            this._irreversibleBlockNum = irreversible;
         } else {
             throw 'Invalid props format';
         }
     }
 
-    _runForkRestore() {
-        // TODO -
-    }
-
     async _runNotifier() {
         while (true) {
-            if (!this._notifierPaused) {
-                await this._notify();
+            const result = await this._notifyByQueue();
+
+            if (result === false) {
+                return;
             }
-            await new Promise(resolve => {
-                setImmediate(resolve);
-            });
+
+            await sleep(0);
         }
     }
 
-    async _notify() {
+    async _notifyByQueue() {
         let item;
-        let blockData;
 
         while ((item = this._blockQueue.shift())) {
-            if (typeof item === 'number') {
-                const block = await this._getBlock(item);
-                const blockNum = BlockUtils.extractBlockNum(block);
+            await this._notifyByItem(item);
+        }
+    }
 
-                Logger.info(`BlockSubscribe - restore block ${item}`);
+    async _notifyByItem(item) {
+        const [blockBody, blockNum] = await this._extractNotifierBlockData(item);
 
-                blockData = [block, blockNum, false];
-            } else {
-                blockData = [...item];
+        if (this._previousBlockBody) {
+            const previousBlockBody = await BlockUtils.getByNum(blockNum - 1);
+
+            for (let operation of previousBlockBody._virtual_operations) {
+                delete operation.trx_id;
+                delete operation.block;
+                delete operation.timestamp;
             }
 
-            this.emit('block', ...blockData);
-
-            if (this._callback) {
-                this._callback(...blockData);
+            if (!isEqual(previousBlockBody, this._previousBlockBody)) {
+                this.emit('fork', this._irreversibleBlockNum);
+                return false;
             }
+        }
+
+        this._previousBlockBody = blockBody;
+
+        this.emit('block', blockBody, blockNum);
+
+        if (this._callback) {
+            this._callback(blockBody, blockNum);
+        }
+    }
+
+    async _extractNotifierBlockData(item) {
+        if (typeof item === 'number') {
+            const block = await this._getBlock(item);
+            const blockNum = BlockUtils.extractBlockNum(block);
+
+            Logger.info(`BlockSubscribe - restore block ${item}`);
+
+            return [block, blockNum];
+        } else {
+            return item;
         }
     }
 }
