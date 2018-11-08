@@ -23,6 +23,7 @@ module.exports = {
     },
     types: {
         BigNum: require('./src/types/BigNum'),
+        MongoBigNum: require('./src/types/MongoBigNum'),
     },
     data: {
         env: require('./src/data/env'),

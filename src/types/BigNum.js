@@ -9,6 +9,8 @@ const BN = require('bignumber.js');
  * вида '1000 gbg'. Использование parseFloat искажает
  * оригинальное значение для очень больних чисел,
  * но эта обертка позволяет работать с ними без потерь.
+ *
+ * Является конечным классом, наследование не предполагается.
  */
 class BigNum {
     /**
@@ -59,6 +61,8 @@ class BigNum {
                         return this._makeCallWrapper(target, property);
                     case 'rawValue':
                         return this.rawValue.bind(this);
+                    case 'toBSON':
+                        return this.toBSON.bind(this);
                     default:
                         return target[property];
                 }
@@ -71,6 +75,13 @@ class BigNum {
      */
     rawValue() {
         return this._value;
+    }
+
+    /**
+     * @return {BN} Значение, пригодное для BSON.
+     */
+    toBSON() {
+        return this._value.toString();
     }
 
     _convertValue(value) {
