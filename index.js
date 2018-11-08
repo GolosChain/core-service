@@ -21,6 +21,9 @@ module.exports = {
         statsClient: require('./src/utils/statsClient'),
         defaultStarter: require('./src/utils/defaultStarter'),
     },
+    types: {
+        BigNum: require('./src/types/BigNum'),
+    },
     data: {
         env: require('./src/data/env'),
     },
