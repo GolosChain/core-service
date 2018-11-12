@@ -1,7 +1,22 @@
+const golos = require('golos-js');
+
 /**
  * Утилита для работы с данными блока блокчейна.
  */
 class Block {
+    /**
+     * Получение блока по указанному номеру.
+     * @param {Number} blockNum Номер блока.
+     * @return {Object} Блок в сыром виде.
+     */
+    static async getByNum(blockNum) {
+        const block = await golos.api.getBlockAsync(blockNum);
+
+        block._virtual_operations = await golos.api.getOpsInBlockAsync(blockNum, true);
+
+        return block;
+    }
+
     /**
      * Извлекает номер блока из данных блока.
      * @param {Object} block Целевой блок.

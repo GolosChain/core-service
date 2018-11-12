@@ -129,7 +129,7 @@ class BlockSubscribe extends BasicService {
     }
 
     async _getBlock(blockNum) {
-        return await golos.api.getBlockAsync(blockNum);
+        return await BlockUtils.getByNum(blockNum);
     }
 
     _runForkRestore() {
