@@ -25,10 +25,15 @@ class MongoDB extends BasicService {
      * Например {fields: {user: 1, data: 1}, options: {sparse: true}}
      * опишет составной индекс с указанием пропуска значений с null.
      * О схемах детальнее описано в документации Mongoose.
+     * @param {Object} optionsConfig.schema Дополнительные общие настройки
+     * для Mongoose схемы.
      * @returns {Model} Модель.
      */
     static makeModel(name, schemaConfig, optionsConfig = {}) {
-        const schema = new mongoose.Schema(schemaConfig, { timestamps: true });
+        const schema = new mongoose.Schema(
+            schemaConfig,
+            Object.assign({ timestamps: true }, optionsConfig.schema)
+        );
 
         if (optionsConfig.index) {
             for (let indexConfig of optionsConfig.index) {
