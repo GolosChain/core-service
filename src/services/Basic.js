@@ -265,6 +265,16 @@ class Basic {
     on(name, callback) {
         this._emitter.on(name, callback);
     }
+
+    /**
+     * Подписка на эвент с указанным именем.
+     * Исполняется один раз.
+     * @param {string/Symbol} name Имя эвента.
+     * @param {Function} callback Колбек.
+     */
+    once(name, callback) {
+        this._emitter.once(name, callback);
+    }
 }
 
 module.exports = Basic;
