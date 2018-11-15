@@ -1,6 +1,6 @@
 const EventEmitter = require('events');
 const logger = require('../utils/Logger');
-const env = require('../env');
+const env = require('../data/env');
 
 /**
  * Базовый сервис, выступающий в роле абстрактного сервиса с частью уже
@@ -69,35 +69,39 @@ class Basic {
 
     /**
      * Абстрактный метод старта сервиса.
+     * @param {...*} [args] Аргументы.
      * @returns {Promise<void>} Промис без экстра данных.
      */
-    async start() {
+    async start(...args) {
         throw 'No service start logic';
     }
 
     /**
      * Абстрактный метод остановки сервиса, не требудет необходимости
      * в имплементации.
+     * @param {...*} [args] Аргументы.
      * @returns {Promise<void>} Промис без экстра данных.
      */
-    async stop() {
+    async stop(...args) {
         logger.log(`No extra stop logic for service ${this.constructor.name}`);
     }
 
     /**
      * Абстрактный метод восстановления сервиса, не требует необходимости
      * в имплементации.
+     * @param {...*} [args] Аргументы.
      * @returns {Promise<void>} Промис без экстра данных.
      */
-    async restore() {
+    async restore(...args) {
         logger.log(`No restore logic for service ${this.constructor.name}`);
     }
 
     /**
      * Абстракнтный метод повторной попытки совершения действия.
+     * @param {...*} [args] Аргументы.
      * @returns {Promise<void>} Промис без экстра данных.
      */
-    async retry() {
+    async retry(...args) {
         throw 'No retry logic';
     }
 
@@ -155,9 +159,10 @@ class Basic {
 
     /**
      * Итерация сервиса в случае если сервис является циклическим.
+     * @param {...*} [args] Аргументы.
      * @returns {Promise<void>} Промис без экстра данных.
      */
-    async iteration() {
+    async iteration(...args) {
         throw 'Empty iteration body';
     }
 
@@ -225,7 +230,7 @@ class Basic {
      * Данные, при необходимости, можно передать аргментами
      * через запятую.
      * @param {string/Symbol} name Имя события.
-     * @param {...any} [data] Данные.
+     * @param {...*} [data] Данные.
      */
     emit(name, ...data) {
         this._emitter.emit(name, ...data);
@@ -233,12 +238,22 @@ class Basic {
 
     /**
      * Трансляция эвентов целевого объекта через себя.
-     * @param {any} from Эмиттер, эвенты которого необходимо транслировать.
-     * @param {...string/...Symbol} events Список эвентов.
+     * @param {Object/Object[]} from Эмиттер, эвенты которого необходимо транслировать.
+     * @param {...string/string/string[]} events Список эвентов.
      */
     translateEmit(from, ...events) {
-        for (let event of events) {
-            from.on(event, (...args) => this.emit(event, ...args));
+        if (!Array.isArray(from)) {
+            from = [from];
+        }
+
+        if (Array.isArray(events[0])) {
+            events = events[0];
+        }
+
+        for (let target of from) {
+            for (let event of events) {
+                target.on(event, (...args) => this.emit(event, ...args));
+            }
         }
     }
 
@@ -249,6 +264,16 @@ class Basic {
      */
     on(name, callback) {
         this._emitter.on(name, callback);
+    }
+
+    /**
+     * Подписка на эвент с указанным именем.
+     * Исполняется один раз.
+     * @param {string/Symbol} name Имя эвента.
+     * @param {Function} callback Колбек.
+     */
+    once(name, callback) {
+        this._emitter.once(name, callback);
     }
 }
 

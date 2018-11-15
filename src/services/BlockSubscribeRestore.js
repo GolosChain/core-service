@@ -1,9 +1,11 @@
 const golos = require('golos-js');
-const stats = require('../Stats').client;
+const stats = require('../utils/statsClient');
 const logger = require('../utils/Logger');
 const BasicService = require('./Basic');
+const BlockUtils = require('../utils/Block');
 
 /**
+ * @deprecated
  * Сервис восстановления пропущенных блоков, необходим в случае
  * простоя микросервиса, за которое блокчейн мог сгенерировать новые блоки,
  * которые также необходимо обработать.
@@ -111,8 +113,7 @@ class BlockSubscribeRestore extends BasicService {
 
         logger.log(`Restore missed registration for block - ${blockNum}`);
 
-        golos.api
-            .getBlockAsync(blockNum)
+        BlockUtils.getByNum(blockNum)
             .then(data => {
                 stats.timing('block_restore', new Date() - timer);
                 setImmediate(this._sync.bind(this));

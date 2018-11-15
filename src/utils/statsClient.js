@@ -1,6 +1,6 @@
 const StatsDClient = require('node-statsd');
-const env = require('./env');
-const logger = require('./utils/Logger');
+const env = require('../data/env');
+const logger = require('../utils/Logger');
 
 /**
  * Класс-обертка для StatsD (получение статуса о работоспособности сервиса).
@@ -33,4 +33,4 @@ class Stats {
     }
 }
 
-module.exports = Stats;
+module.exports = Stats.client;

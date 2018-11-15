@@ -1,4 +1,5 @@
 const golos = require('golos-js');
+const BigNum = require('../types/BigNum');
 
 /**
  * Класс утилит работы со значениями из блокчейна.
@@ -14,12 +15,19 @@ class BlockChainValues {
      * @returns {number} Результирующие значение.
      */
     static golosToVests(golos, globalProperties) {
-        const { total_vesting_fund_steem, total_vesting_shares } = globalProperties;
-        const totalVestingFundSteem = parseFloat(total_vesting_fund_steem);
-        const totalVestingShares = parseFloat(total_vesting_shares);
-        const vests = golos / (totalVestingFundSteem / totalVestingShares);
+        golos = new BigNum(golos);
 
-        return +vests.toFixed(6);
+        let totalVestingFundSteem =
+            globalProperties.totalVestingFundGolos ||
+            new BigNum(globalProperties.total_vesting_fund_steem) ||
+            new BigNum(0);
+        const totalVestingShares =
+            globalProperties.totalVestingShares ||
+            new BigNum(globalProperties.total_vesting_shares) ||
+            new BigNum(0);
+        const vests = golos.div(totalVestingFundSteem.div(totalVestingShares));
+
+        return vests.dp(6);
     }
 
     /**
@@ -32,12 +40,19 @@ class BlockChainValues {
      * @returns {number} Результирующие значение.
      */
     static vestsToGolos(vests, globalProperties) {
-        const { total_vesting_fund_steem, total_vesting_shares } = globalProperties;
-        const totalVestingFundSteem = parseFloat(total_vesting_fund_steem);
-        const totalVestingShares = parseFloat(total_vesting_shares);
-        const golos = totalVestingFundSteem * (vests / totalVestingShares);
+        vests = new BigNum(vests);
 
-        return +golos.toFixed(3);
+        const totalVestingFundSteem =
+            globalProperties.totalVestingFundGolos ||
+            new BigNum(globalProperties.total_vesting_fund_steem) ||
+            new BigNum(0);
+        const totalVestingShares =
+            globalProperties.totalVestingShares ||
+            new BigNum(globalProperties.total_vesting_shares) ||
+            new BigNum(0);
+        const golos = totalVestingFundSteem.times(vests.div(totalVestingShares));
+
+        return golos.dp(3);
     }
 
     /**
@@ -46,6 +61,14 @@ class BlockChainValues {
      */
     static async getDynamicGlobalProperties() {
         return await golos.api.getDynamicGlobalPropertiesAsync();
+    }
+
+    /**
+     * Данные по медианной исторической цене на данный момент.
+     * @returns {Promise<Object>} Сырой объект из блокчейна.
+     */
+    static async getCurrentMedianHistoryPrice() {
+        return await golos.api.getCurrentMedianHistoryPriceAsync();
     }
 }
 
