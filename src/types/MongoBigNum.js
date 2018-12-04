@@ -12,3 +12,5 @@ class MongoBigNum extends mongoose.SchemaType {
 }
 
 mongoose.Schema.Types.MongoBigNum = MongoBigNum;
+
+module.exports = mongoose.Schema.Types.MongoBigNum;
