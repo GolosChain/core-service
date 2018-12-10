@@ -60,7 +60,7 @@ class Block {
      * @param {Function} callback Колбек.
      */
     static eachRealOperationCb(block, callback) {
-        for (let operation of this.eachRealOperationGen()) {
+        for (let operation of this.eachRealOperation(block)) {
             callback(operation);
         }
     }
@@ -94,7 +94,7 @@ class Block {
      * @param {Function} callback Колбек.
      */
     static eachVirtualOperationCb(block, callback) {
-        for (let operation of this.eachVirtualOperationGen(block)) {
+        for (let operation of this.eachVirtualOperation(block)) {
             callback(operation);
         }
     }

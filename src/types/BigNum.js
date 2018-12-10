@@ -105,7 +105,7 @@ class BigNum {
             const hex = '0x\\d+|-0x\\d+';
             const octal = '0o\\d+|-0o\\d+';
             const binary = '0b\\d+|-0b\\d+';
-            const decimal = '\\d+|-\\d+';
+            const decimal = '\\.\\d*|-\\.\\d*|\\d+\\.\\d*|-\\d+\\.\\d*|\\d+|-\\d+';
             const check = [hex, octal, binary, decimal].join('|');
             const matched = value.match(new RegExp(check));
 
