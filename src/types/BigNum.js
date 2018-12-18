@@ -78,7 +78,7 @@ class BigNum {
     }
 
     /**
-     * @return {BN} Значение, пригодное для BSON.
+     * @return {string} Значение, пригодное для BSON.
      */
     toBSON() {
         return this._value.toString();

@@ -1,5 +1,4 @@
 const sleep = require('then-sleep');
-const isEqual = require('lodash.isequal');
 const BasicService = require('./Basic');
 const golos = require('golos-js');
 const BlockUtils = require('../utils/Block');
@@ -27,7 +26,7 @@ class BlockSubscribe extends BasicService {
         this._firstBlockNum = null;
 
         this._irreversibleBlockNum = null;
-        this._previousBlockBody = null;
+        this._previousBlockId = null;
     }
 
     /**
@@ -190,22 +189,14 @@ class BlockSubscribe extends BasicService {
     async _notifyByItem(item) {
         const [blockBody, blockNum] = await this._extractNotifierBlockData(item);
 
-        if (this._previousBlockBody) {
-            const previousBlockBody = await BlockUtils.getByNum(blockNum - 1);
-
-            for (let operation of previousBlockBody._virtual_operations) {
-                delete operation.trx_id;
-                delete operation.block;
-                delete operation.timestamp;
-            }
-
-            if (!isEqual(previousBlockBody, this._previousBlockBody)) {
+        if (this._previousBlockId) {
+            if (blockBody.previous !== this._previousBlockId) {
                 this.emit('fork', this._irreversibleBlockNum);
                 return false;
             }
         }
 
-        this._previousBlockBody = blockBody;
+        this._previousBlockId = blockBody.block_id;
 
         this.emit('block', blockBody, blockNum);
 
