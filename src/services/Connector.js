@@ -107,12 +107,14 @@ class Connector extends BasicService {
         }
     }
 
-    _normalizeRoutes(routes) {
-        for (let route of Object.keys(routes)) {
-            let originHandler = routes[route];
+    _normalizeRoutes(originalRoutes) {
+        const routes = {};
+
+        for (const route of Object.keys(originalRoutes)) {
+            const originHandler = originalRoutes[route];
 
             routes[route] = (data, callback) => {
-                originHandler.call(null, data).then(
+                originHandler(data).then(
                     data => {
                         if (!data || data === 'Ok') {
                             data = { status: 'OK' };
@@ -131,22 +133,34 @@ class Connector extends BasicService {
     }
 
     _handleHandlerError(callback, error) {
-        [EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError].forEach(
-            internalErrorType => {
-                if (error instanceof internalErrorType) {
-                    logger.error(`Internal route error - ${error.message} - ${error.stack}`);
-                    process.exit(1);
-                }
+        for (const InternalErrorType of [
+            EvalError,
+            RangeError,
+            ReferenceError,
+            SyntaxError,
+            TypeError,
+            URIError,
+        ]) {
+            if (error instanceof InternalErrorType) {
+                logger.error(`Internal route error - ${error.message} - ${error.stack}`);
+                process.exit(1);
             }
-        );
-
-        switch (error.code) {
-            case 'ECONNREFUSED':
-                callback({ code: 1001, message: 'Internal server error' }, null);
-                break;
-            default:
-                callback(error, null);
         }
+
+        if (error.code === 'ECONNREFUSED') {
+            callback({ code: 1001, message: 'Internal server error' }, null);
+            return;
+        }
+
+        // Если объект не явлеяется ошибкой и при этом содержит поля code и message
+        // то возвращаем ошибку без дополнительного логирования
+        if (!(error instanceof Error) && error.code && error.message) {
+            callback(error, null);
+            return;
+        }
+
+        logger.error(error);
+        callback({}, null);
     }
 }
 
