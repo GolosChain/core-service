@@ -24,9 +24,6 @@
     "then-sleep": "^1.0.1",
     "ws": "^5.2.2"
   },
-  "devDependencies": {
-    "prettier": "^1.15.3"
-  },
   "prettier": {
     "singleQuote": true,
     "tabWidth": 4,

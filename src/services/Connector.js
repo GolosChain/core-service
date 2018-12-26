@@ -2,6 +2,7 @@ const jayson = require('jayson');
 const env = require('../data/env');
 const logger = require('../utils/Logger');
 const BasicService = require('./Basic');
+const stats = require('../utils/statsClient');
 
 /**
  * Сервис связи между микросервисами.
@@ -27,11 +28,17 @@ const BasicService = require('./Basic');
  *  ```
  *
  * Ключ является алиасом для отправки последующих запросов через метод sendTo.
+ * @param {string} serviceName - используется для сбора статистики
  */
 class Connector extends BasicService {
-    constructor() {
+    constructor(serviceName) {
         super();
 
+        if (!serviceName) {
+            throw new Error('No service name');
+        }
+
+        this._serviceName = serviceName;
         this._server = null;
         this._clientsMap = new Map();
     }
@@ -83,9 +90,9 @@ class Connector extends BasicService {
     }
 
     _startServer(rawRoutes) {
-        const routes = this._normalizeRoutes(rawRoutes);
-
         return new Promise((resolve, reject) => {
+            const routes = this._wrapRoutes(rawRoutes);
+
             this._server = jayson.server(routes).http();
 
             this._server.listen(env.GLS_CONNECTOR_PORT, env.GLS_CONNECTOR_HOST, error => {
@@ -107,25 +114,39 @@ class Connector extends BasicService {
         }
     }
 
-    _normalizeRoutes(originalRoutes) {
+    _wrapRoutes(originalRoutes) {
         const routes = {};
 
         for (const route of Object.keys(originalRoutes)) {
             const originHandler = originalRoutes[route];
 
-            routes[route] = (data, callback) => {
-                originHandler(data).then(
-                    data => {
-                        if (!data || data === 'Ok') {
-                            data = { status: 'OK' };
-                        }
+            routes[route] = async (params, callback) => {
+                const startTs = Date.now();
+                let isError = true;
 
-                        callback(null, data);
-                    },
-                    error => {
-                        this._handleHandlerError(callback, error);
+                try {
+                    let data = await originHandler(params);
+
+                    if (!data || data === 'Ok') {
+                        data = { status: 'OK' };
                     }
-                );
+
+                    callback(null, data);
+                } catch (err) {
+                    isError = true;
+                    this._handleHandlerError(callback, err);
+                } finally {
+                    const time = Date.now() - startTs;
+
+                    let suffix = '';
+
+                    if (isError) {
+                        suffix = '_error';
+                    }
+
+                    stats.timing(`${this._serviceName}_api_call${suffix}`, time);
+                    stats.timing(`${this._serviceName}_api_${route}${suffix}`, time);
+                }
             };
         }
 
