@@ -51,6 +51,16 @@ class Basic {
             throw 'Connector not defined';
         }
     }
+
+    async callService(service, method, params) {
+        const response = await this.sendTo(service, method, params);
+
+        if (response.error) {
+            throw response.error;
+        }
+
+        return response.result;
+    }
 }
 
 module.exports = Basic;
