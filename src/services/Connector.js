@@ -142,7 +142,7 @@ class Connector extends BasicService {
             URIError,
         ]) {
             if (error instanceof InternalErrorType) {
-                logger.error(`Internal route error - ${error.message} - ${error.stack}`);
+                logger.error(`Internal route error: ${error.stack}`);
                 process.exit(1);
             }
         }
@@ -152,8 +152,6 @@ class Connector extends BasicService {
             return;
         }
 
-        // Если объект не явлеяется ошибкой и при этом содержит поля code и message
-        // то возвращаем ошибку без дополнительного логирования
         if (!(error instanceof Error) && error.code && error.message) {
             callback(error, null);
             return;
