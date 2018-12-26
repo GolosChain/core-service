@@ -3,6 +3,7 @@ const env = require('../data/env');
 const logger = require('../utils/Logger');
 const BasicService = require('./Basic');
 const stats = require('../utils/statsClient');
+const meta = require('../utils/serviceMeta');
 
 /**
  * Сервис связи между микросервисами.
@@ -28,17 +29,11 @@ const stats = require('../utils/statsClient');
  *  ```
  *
  * Ключ является алиасом для отправки последующих запросов через метод sendTo.
- * @param {string} serviceName - используется для сбора статистики
  */
 class Connector extends BasicService {
-    constructor(serviceName) {
+    constructor() {
         super();
 
-        if (!serviceName) {
-            throw new Error('No service name');
-        }
-
-        this._serviceName = serviceName;
         this._server = null;
         this._clientsMap = new Map();
     }
@@ -144,8 +139,12 @@ class Connector extends BasicService {
                         suffix = '_error';
                     }
 
-                    stats.timing(`${this._serviceName}_api_call${suffix}`, time);
-                    stats.timing(`${this._serviceName}_api_${route}${suffix}`, time);
+                    const serviceName = meta.get('name');
+
+                    if (serviceName) {
+                        stats.timing(`${serviceName}_api_call${suffix}`, time);
+                        stats.timing(`${serviceName}_api_${route}${suffix}`, time);
+                    }
                 }
             };
         }
