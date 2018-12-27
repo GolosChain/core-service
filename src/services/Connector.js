@@ -3,7 +3,7 @@ const env = require('../data/env');
 const logger = require('../utils/Logger');
 const BasicService = require('./Basic');
 const stats = require('../utils/statsClient');
-const meta = require('../utils/serviceMeta');
+const ServiceMeta = require('../utils/ServiceMeta');
 
 /**
  * Сервис связи между микросервисами.
@@ -139,12 +139,10 @@ class Connector extends BasicService {
                         suffix = '_error';
                     }
 
-                    const serviceName = meta.get('name');
+                    const serviceName = ServiceMeta.get('name') || 'service';
 
-                    if (serviceName) {
-                        stats.timing(`${serviceName}_api_call${suffix}`, time);
-                        stats.timing(`${serviceName}_api_${route}${suffix}`, time);
-                    }
+                    stats.timing(`${serviceName}_api_call${suffix}`, time);
+                    stats.timing(`${serviceName}_api_${route}${suffix}`, time);
                 }
             };
         }

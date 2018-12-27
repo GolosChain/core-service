@@ -19,7 +19,7 @@ module.exports = {
         Template: require('./src/utils/Template'),
         RpcObject: require('./src/utils/RpcObject'),
         statsClient: require('./src/utils/statsClient'),
-        serviceMeta: require('./src/utils/serviceMeta'),
+        ServiceMeta: require('./src/utils/ServiceMeta'),
         defaultStarter: require('./src/utils/defaultStarter'),
     },
     types: {
