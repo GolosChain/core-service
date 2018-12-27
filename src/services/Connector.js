@@ -86,7 +86,7 @@ class Connector extends BasicService {
 
     _startServer(rawRoutes) {
         return new Promise((resolve, reject) => {
-            const routes = this._wrapRoutes(rawRoutes);
+            const routes = this._normalizeRoutes(rawRoutes);
 
             this._server = jayson.server(routes).http();
 
@@ -109,45 +109,53 @@ class Connector extends BasicService {
         }
     }
 
-    _wrapRoutes(originalRoutes) {
+    _normalizeRoutes(originalRoutes) {
         const routes = {};
 
         for (const route of Object.keys(originalRoutes)) {
             const originHandler = originalRoutes[route];
 
-            routes[route] = async (params, callback) => {
-                const startTs = Date.now();
-                let isError = true;
-
-                try {
-                    let data = await originHandler(params);
-
-                    if (!data || data === 'Ok') {
-                        data = { status: 'OK' };
-                    }
-
-                    callback(null, data);
-                } catch (err) {
-                    isError = true;
-                    this._handleHandlerError(callback, err);
-                } finally {
-                    const time = Date.now() - startTs;
-
-                    let suffix = '';
-
-                    if (isError) {
-                        suffix = '_error';
-                    }
-
-                    const serviceName = ServiceMeta.get('name') || 'service';
-
-                    stats.timing(`${serviceName}_api_call${suffix}`, time);
-                    stats.timing(`${serviceName}_api_${route}${suffix}`, time);
-                }
-            };
+            routes[route] = this._wrapMethod(route, originHandler);
         }
 
         return routes;
+    }
+
+    _wrapMethod(route, originHandler) {
+        return async (params, callback) => {
+            const startTs = Date.now();
+            let isError = true;
+
+            try {
+                let data = await originHandler(params);
+
+                if (!data || data === 'Ok') {
+                    data = { status: 'OK' };
+                }
+
+                callback(null, data);
+            } catch (err) {
+                isError = true;
+                this._handleHandlerError(callback, err);
+            }
+
+            this._reportStats(route, startTs, isError);
+        };
+    }
+
+    _reportStats(route, startTs, isError) {
+        const time = Date.now() - startTs;
+
+        let suffix = '';
+
+        if (isError) {
+            suffix = '_error';
+        }
+
+        const serviceName = ServiceMeta.get('name') || 'service';
+
+        stats.timing(`${serviceName}_api_call${suffix}`, time);
+        stats.timing(`${serviceName}_api_${route}${suffix}`, time);
     }
 
     _handleHandlerError(callback, error) {
