@@ -12,12 +12,12 @@ const Logger = require('../utils/Logger');
 class Basic {
     /**
      * Конструктор
-     * @param {Object} options Настройки контроллера.
-     * @param {Object} options.connector Произвольный инстанс класса коннектора,
+     * @param {Object} [options] Настройки контроллера.
+     * @param {Object} [options.connector] Произвольный инстанс класса коннектора,
      * предполагается что это Connector для общения между микросервисами,
      * но им может быть и любой другой класс, имплементирующий схожий интерфейс.
      */
-    constructor({ connector }) {
+    constructor({ connector } = {}) {
         if (connector) {
             this.connector = connector;
         }

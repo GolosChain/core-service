@@ -2,6 +2,8 @@ const jayson = require('jayson');
 const env = require('../data/env');
 const logger = require('../utils/Logger');
 const BasicService = require('./Basic');
+const stats = require('../utils/statsClient');
+const ServiceMeta = require('../utils/ServiceMeta');
 
 /**
  * Сервис связи между микросервисами.
@@ -83,9 +85,9 @@ class Connector extends BasicService {
     }
 
     _startServer(rawRoutes) {
-        const routes = this._normalizeRoutes(rawRoutes);
-
         return new Promise((resolve, reject) => {
+            const routes = this._normalizeRoutes(rawRoutes);
+
             this._server = jayson.server(routes).http();
 
             this._server.listen(env.GLS_CONNECTOR_PORT, env.GLS_CONNECTOR_HOST, error => {
@@ -107,46 +109,82 @@ class Connector extends BasicService {
         }
     }
 
-    _normalizeRoutes(routes) {
-        for (let route of Object.keys(routes)) {
-            let originHandler = routes[route];
+    _normalizeRoutes(originalRoutes) {
+        const routes = {};
 
-            routes[route] = (data, callback) => {
-                originHandler.call(null, data).then(
-                    data => {
-                        if (!data || data === 'Ok') {
-                            data = { status: 'OK' };
-                        }
+        for (const route of Object.keys(originalRoutes)) {
+            const originHandler = originalRoutes[route];
 
-                        callback(null, data);
-                    },
-                    error => {
-                        this._handleHandlerError(callback, error);
-                    }
-                );
-            };
+            routes[route] = this._wrapMethod(route, originHandler);
         }
 
         return routes;
     }
 
-    _handleHandlerError(callback, error) {
-        [EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError].forEach(
-            internalErrorType => {
-                if (error instanceof internalErrorType) {
-                    logger.error(`Internal route error - ${error.message} - ${error.stack}`);
-                    process.exit(1);
-                }
-            }
-        );
+    _wrapMethod(route, originHandler) {
+        return async (params, callback) => {
+            const startTs = Date.now();
+            let isError = true;
 
-        switch (error.code) {
-            case 'ECONNREFUSED':
-                callback({ code: 1001, message: 'Internal server error' }, null);
-                break;
-            default:
-                callback(error, null);
+            try {
+                let data = await originHandler(params);
+
+                if (!data || data === 'Ok') {
+                    data = { status: 'OK' };
+                }
+
+                callback(null, data);
+            } catch (err) {
+                isError = true;
+                this._handleHandlerError(callback, err);
+            }
+
+            this._reportStats(route, startTs, isError);
+        };
+    }
+
+    _reportStats(route, startTs, isError) {
+        const time = Date.now() - startTs;
+
+        let suffix = '';
+
+        if (isError) {
+            suffix = '_error';
         }
+
+        const serviceName = ServiceMeta.get('name') || 'service';
+
+        stats.timing(`${serviceName}_api_call${suffix}`, time);
+        stats.timing(`${serviceName}_api_${route}${suffix}`, time);
+    }
+
+    _handleHandlerError(callback, error) {
+        for (const InternalErrorType of [
+            EvalError,
+            RangeError,
+            ReferenceError,
+            SyntaxError,
+            TypeError,
+            URIError,
+        ]) {
+            if (error instanceof InternalErrorType) {
+                logger.error(`Internal route error: ${error.stack}`);
+                process.exit(1);
+            }
+        }
+
+        if (error.code === 'ECONNREFUSED') {
+            callback({ code: 1001, message: 'Internal server error' }, null);
+            return;
+        }
+
+        if (!(error instanceof Error) && error.code && error.message) {
+            callback(error, null);
+            return;
+        }
+
+        logger.error(error);
+        callback({}, null);
     }
 }
 
