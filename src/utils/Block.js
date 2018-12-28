@@ -52,7 +52,7 @@ class Block {
                 if (Array.isArray(operationPack)) {
                     yield [operationPack[0], operationPack[1]];
                 } else {
-                    yield [operationPack.type, operationPack];
+                    yield [operationPack.operationType, operationPack];
                 }
             }
         }
@@ -82,7 +82,7 @@ class Block {
 
         for (let virtual of block._virtual_operations) {
             if (!virtual.op) {
-                yield [virtual.type, virtual];
+                yield [virtual.operationType, virtual];
                 continue;
             }
 
