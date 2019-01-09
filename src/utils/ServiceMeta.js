@@ -1,4 +1,4 @@
-const Logger = require('Logger');
+const Logger = require('./Logger');
 
 /**
  * Класс для хранения глобальных мета-данных микросервиса.
