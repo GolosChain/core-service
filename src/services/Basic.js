@@ -83,7 +83,7 @@ class Basic {
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async stop(...args) {
-        logger.log(`No extra stop logic for service ${this.constructor.name}`);
+        // Do nothing for now
     }
 
     /**
@@ -93,7 +93,7 @@ class Basic {
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async restore(...args) {
-        logger.log(`No restore logic for service ${this.constructor.name}`);
+        // Do nothing for now
     }
 
     /**
