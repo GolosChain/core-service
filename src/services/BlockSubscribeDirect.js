@@ -91,7 +91,7 @@ class BlockSubscribe extends BasicService {
 
     _handleError(error) {
         stats.increment('block_subscribe_error');
-        logger.error(`BlockSubscribe websocket error - ${error}`);
+        logger.error(`BlockSubscribe websocket error - ${error.stack}`);
         process.exit(1);
     }
 

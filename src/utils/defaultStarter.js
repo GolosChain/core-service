@@ -13,7 +13,7 @@ module.exports = Main => {
             Logger.info('Main service started!');
         },
         error => {
-            Logger.error(`Main service failed - ${error}`);
+            Logger.error(`Main service failed - ${error.stack}`);
             process.exit(1);
         }
     );

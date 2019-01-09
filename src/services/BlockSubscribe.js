@@ -70,14 +70,14 @@ class BlockSubscribe extends BasicService {
 
         this.on('readyToNotify', () => {
             this._runNotifier().catch(error => {
-                Logger.error(`BlockSubscribe - notifier error ${error}`);
+                Logger.error(`BlockSubscribe - notifier error ${error.stack}`);
                 process.exit(1);
             });
         });
 
         this.on('firstBlockGet', blockNum => {
             this._runBootRestore(blockNum).catch(error => {
-                Logger.error(`Cant handle first block - ${error}`);
+                Logger.error(`Cant handle first block - ${error.stack}`);
                 process.exit(1);
             });
         });
@@ -88,7 +88,7 @@ class BlockSubscribe extends BasicService {
             const timer = new Date();
 
             if (error) {
-                Logger.error(`Block subscribe error - ${error}`);
+                Logger.error(`Block subscribe error - ${error.stack}`);
                 process.exit(1);
             }
 
@@ -140,7 +140,7 @@ class BlockSubscribe extends BasicService {
         try {
             await this._updateIrreversibleBlockNum();
         } catch (error) {
-            Logger.error(`Cant load irreversible num, but continue - ${error}`);
+            Logger.error(`Cant load irreversible num, but continue - ${error.stack}`);
             await sleep(1000);
             await this._runIrreversibleUpdateLoop();
             return;
@@ -150,7 +150,7 @@ class BlockSubscribe extends BasicService {
             try {
                 await this._updateIrreversibleBlockNum();
             } catch (error) {
-                Logger.error(`Cant load irreversible num, but skip - ${error}`);
+                Logger.error(`Cant load irreversible num, but skip - ${error.stack}`);
             }
         }, env.GLS_IRREVERSIBLE_BLOCK_UPDATE_INTERVAL);
     }

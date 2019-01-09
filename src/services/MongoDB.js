@@ -66,7 +66,7 @@ class MongoDB extends BasicService {
 
             connection.on('error', error => {
                 stats.increment('mongo_error');
-                logger.error(`MongoDB - ${error}`);
+                logger.error(`MongoDB - ${error.stack}`);
                 process.exit(1);
             });
             connection.once('open', () => {

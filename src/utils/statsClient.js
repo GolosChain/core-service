@@ -28,7 +28,7 @@ class Stats {
         });
 
         this._client.socket.on('error', error => {
-            logger.error(`Metrics error - ${error}`);
+            logger.error(`Metrics error - ${error.stack}`);
         });
     }
 }
