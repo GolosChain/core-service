@@ -2,6 +2,7 @@ const moment = require('moment');
 const env = require('../data/env');
 
 /**
+ * @deprecated
  * Утилита для типичных временных сущностей.
  */
 class Moments {

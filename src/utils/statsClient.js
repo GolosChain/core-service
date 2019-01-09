@@ -1,6 +1,6 @@
 const StatsDClient = require('node-statsd');
 const env = require('../data/env');
-const logger = require('../utils/Logger');
+const Logger = require('../utils/Logger');
 
 /**
  * Класс-обертка для StatsD (получение статуса о работоспособности сервиса).
@@ -28,7 +28,7 @@ class Stats {
         });
 
         this._client.socket.on('error', error => {
-            logger.error(`Metrics error - ${error.stack}`);
+            Logger.error(`Metrics error - ${error.stack}`);
         });
     }
 }

@@ -1,6 +1,6 @@
 const jayson = require('jayson');
 const env = require('../data/env');
-const logger = require('../utils/Logger');
+const Logger = require('../utils/Logger');
 const BasicService = require('./Basic');
 const stats = require('../utils/statsClient');
 const ServiceMeta = require('../utils/ServiceMeta');
@@ -168,7 +168,7 @@ class Connector extends BasicService {
             URIError,
         ]) {
             if (error instanceof InternalErrorType) {
-                logger.error(`Internal route error: ${error.stack}`);
+                Logger.error(`Internal route error: ${error.stack}`);
                 process.exit(1);
             }
         }
@@ -183,7 +183,7 @@ class Connector extends BasicService {
             return;
         }
 
-        logger.error(error);
+        Logger.error(error);
         callback({}, null);
     }
 }

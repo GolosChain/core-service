@@ -1,6 +1,5 @@
-const golos = require('golos-js');
 const stats = require('../utils/statsClient');
-const logger = require('../utils/Logger');
+const Logger = require('../utils/Logger');
 const BasicService = require('./Basic');
 const BlockUtils = require('../utils/Block');
 
@@ -81,7 +80,7 @@ class BlockSubscribeRestore extends BasicService {
         this._currentBlockNum = blockNum;
 
         if (!this._syncedBlockNum) {
-            logger.log('Empty sync collection,', `then start sync from block ${previousBlockNum}`);
+            Logger.log('Empty sync collection,', `then start sync from block ${previousBlockNum}`);
             this._syncedBlockNum = previousBlockNum;
         }
 
@@ -111,7 +110,7 @@ class BlockSubscribeRestore extends BasicService {
         const blockNum = this._syncStack.pop();
         const timer = new Date();
 
-        logger.log(`Restore missed registration for block - ${blockNum}`);
+        Logger.log(`Restore missed registration for block - ${blockNum}`);
 
         BlockUtils.getByNum(blockNum)
             .then(data => {
