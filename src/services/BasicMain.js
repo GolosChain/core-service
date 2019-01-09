@@ -25,6 +25,7 @@ class BasicMain extends Basic {
 
         this._stats = stats;
         this.stopOnExit();
+        this.throwOnUnhandledPromiseRejection();
     }
 
     async start() {

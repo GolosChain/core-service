@@ -1,5 +1,5 @@
 const EventEmitter = require('events');
-const logger = require('../utils/Logger');
+const Logger = require('../utils/Logger');
 const env = require('../data/env');
 
 /**
@@ -118,15 +118,15 @@ class Basic {
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async startNested() {
-        logger.info('Start services...');
+        Logger.info('Start services...');
 
         for (let service of this._nestedServices) {
-            logger.info(`Start ${service.constructor.name}...`);
+            Logger.info(`Start ${service.constructor.name}...`);
             await service.start();
-            logger.info(`The ${service.constructor.name} done!`);
+            Logger.info(`The ${service.constructor.name} done!`);
         }
 
-        logger.info('Start services done!');
+        Logger.info('Start services done!');
     }
 
     /**
@@ -134,19 +134,19 @@ class Basic {
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async stopNested() {
-        logger.info('Cleanup...');
+        Logger.info('Cleanup...');
 
         for (let service of this._nestedServices.reverse()) {
-            logger.info(`Stop ${service.constructor.name}...`);
+            Logger.info(`Stop ${service.constructor.name}...`);
 
             if (!service.isDone()) {
                 await service.stop();
             }
 
-            logger.info(`The ${service.constructor.name} done!`);
+            Logger.info(`The ${service.constructor.name} done!`);
         }
 
-        logger.info('Cleanup done!');
+        Logger.info('Cleanup done!');
     }
 
     /**
@@ -155,6 +155,17 @@ class Basic {
      */
     stopOnExit() {
         process.on('SIGINT', this.stop.bind(this));
+    }
+
+    /**
+     * Завершает процесс с ошибкой в случае обнаружения необработанного
+     * реджекта/ошибки промиса.
+     */
+    throwOnUnhandledPromiseRejection() {
+        process.on('unhandledRejection', error => {
+            Logger.error('Unhandled promise rejection - ', error.stack);
+            process.exit(1);
+        });
     }
 
     /**
@@ -195,23 +206,23 @@ class Basic {
      * @param {Object} [serviceEnv] Модуль конфигурации уровня микросервиса.
      */
     printEnvBasedConfig(serviceEnv = {}) {
-        logger.info('ENV-based config:');
-        logger.info('Core config params:');
-        logger.info('---');
+        Logger.info('ENV-based config:');
+        Logger.info('Core config params:');
+        Logger.info('---');
 
         for (let key of Object.keys(env)) {
-            logger.info(`${key} = ${env[key]}`);
+            Logger.info(`${key} = ${env[key]}`);
         }
 
-        logger.info('---');
-        logger.info('Service config params:');
-        logger.info('---');
+        Logger.info('---');
+        Logger.info('Service config params:');
+        Logger.info('---');
 
         for (let key of Object.keys(serviceEnv)) {
-            logger.info(`${key} = ${serviceEnv[key]}`);
+            Logger.info(`${key} = ${serviceEnv[key]}`);
         }
 
-        logger.info('---');
+        Logger.info('---');
     }
 
     /**
