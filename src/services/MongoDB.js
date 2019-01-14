@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const BasicService = require('./Basic');
+const ServiceMeta = require('../utils/ServiceMeta');
 const stats = require('../utils/statsClient');
 
 /**
@@ -65,12 +66,12 @@ class MongoDB extends BasicService {
             const connection = mongoose.connection;
 
             connection.on('error', error => {
-                stats.increment('mongo_error');
+                const serviceName = ServiceMeta.get('name') || 'service';
+                stats.increment(`${serviceName}:mongo_error`);
                 Logger.error(`MongoDB - ${error.stack}`);
                 process.exit(1);
             });
             connection.once('open', () => {
-                stats.increment('mongo_connected');
                 Logger.info('MongoDB connection established.');
                 resolve();
             });
