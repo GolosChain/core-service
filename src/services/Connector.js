@@ -74,12 +74,16 @@ class Connector extends BasicService {
      */
     sendTo(service, method, data) {
         return new Promise((resolve, reject) => {
+            const startTs = Date.now();
+
             this._clientsMap.get(service).request(method, data, (error, response) => {
                 if (error) {
                     reject(error);
                 } else {
                     resolve(response);
                 }
+
+                this._reportStats(`${service}.${method}`, 'call', startTs, Boolean(error));
             });
         });
     }
@@ -124,7 +128,7 @@ class Connector extends BasicService {
     _wrapMethod(route, originHandler) {
         return async (params, callback) => {
             const startTs = Date.now();
-            let isError = true;
+            let isError = false;
 
             try {
                 let data = await originHandler(params);
@@ -139,23 +143,30 @@ class Connector extends BasicService {
                 this._handleHandlerError(callback, err);
             }
 
-            this._reportStats(route, startTs, isError);
+            this._reportStats(route, 'handle', startTs, isError);
         };
     }
 
-    _reportStats(route, startTs, isError) {
+    _reportStats(route, type, startTs, isError) {
         const time = Date.now() - startTs;
 
-        let suffix = '';
+        let status;
 
         if (isError) {
-            suffix = '_error';
+            status = 'failure';
+        } else {
+            status = 'success';
         }
 
         const serviceName = ServiceMeta.get('name') || 'service';
 
-        stats.timing(`${serviceName}_api_call${suffix}`, time);
-        stats.timing(`${serviceName}_api_${route}${suffix}`, time);
+        const general = `${serviceName}:${type}_api_${status}`;
+        const detail = `${serviceName}:${type}_${route}_${status}`;
+
+        stats.increment(`${general}_count`);
+        stats.timing(`${general}_time`, time);
+        stats.increment(`${detail}_count`);
+        stats.timing(`${detail}_time`, time);
     }
 
     _handleHandlerError(callback, error) {
