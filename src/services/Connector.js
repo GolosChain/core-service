@@ -168,14 +168,13 @@ class Connector extends BasicService {
         }
 
         const serviceName = ServiceMeta.get('name');
-
         const general = `${serviceName}:${type}_api_${status}`;
-        const detail = `${serviceName}:${type}_${method}_${status}`;
+        const details = `${serviceName}:${type}_${method}_${status}`;
 
         stats.increment(`${general}_count`);
         stats.timing(`${general}_time`, time);
-        stats.increment(`${detail}_count`);
-        stats.timing(`${detail}_time`, time);
+        stats.increment(`${details}_count`);
+        stats.timing(`${details}_time`, time);
     }
 
     _handleHandlerError(callback, error) {

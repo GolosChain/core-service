@@ -13,10 +13,13 @@ class ServiceMeta {
      * @return {*} Хранящееся значение.
      */
     static get(key) {
-        let value = this._store[key];
+        const value = this._store[key];
 
-        if (!value && key === 'name') {
-            value = 'service';
+        if (!value) {
+            switch (key) {
+                case 'name':
+                    return 'service';
+            }
         }
 
         return value;
