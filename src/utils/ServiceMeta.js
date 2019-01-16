@@ -15,14 +15,14 @@ class ServiceMeta {
     static get(key) {
         const value = this._store[key];
 
-        if (!value) {
-            switch (key) {
-                case 'name':
-                    return 'service';
-            }
+        if (value) {
+            return value;
         }
 
-        return value;
+        switch (key) {
+            case 'name':
+                return 'service';
+        }
     }
 
     /**
