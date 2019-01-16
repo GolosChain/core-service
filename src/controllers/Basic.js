@@ -12,12 +12,12 @@ const Logger = require('../utils/Logger');
 class Basic {
     /**
      * Конструктор
-     * @param {Object} options Настройки контроллера.
-     * @param {Object} options.connector Произвольный инстанс класса коннектора,
+     * @param {Object} [options] Настройки контроллера.
+     * @param {Object} [options.connector] Произвольный инстанс класса коннектора,
      * предполагается что это Connector для общения между микросервисами,
      * но им может быть и любой другой класс, имплементирующий схожий интерфейс.
      */
-    constructor({ connector }) {
+    constructor({ connector } = {}) {
         if (connector) {
             this.connector = connector;
         }
@@ -50,6 +50,16 @@ class Basic {
             Logger.error('Basic controller - connector not defined');
             throw 'Connector not defined';
         }
+    }
+
+    async callService(service, method, params) {
+        const response = await this.sendTo(service, method, params);
+
+        if (response.error) {
+            throw response.error;
+        }
+
+        return response.result;
     }
 }
 

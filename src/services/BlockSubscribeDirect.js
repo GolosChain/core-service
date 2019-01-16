@@ -1,5 +1,5 @@
 const WebSocket = require('ws');
-const logger = require('../utils/Logger');
+const Logger = require('../utils/Logger');
 const stats = require('../utils/statsClient');
 const BasicService = require('./Basic');
 
@@ -72,7 +72,7 @@ class BlockSubscribe extends BasicService {
             return callback(data, blockNum);
         });
         this._socket.on('open', () => {
-            logger.info('BlockSubscribe websocket connection established.');
+            Logger.info('BlockSubscribe websocket connection established.');
             this._socket.send(MAGIC_SUBSCRIBE_CALL);
         });
     }
@@ -91,7 +91,7 @@ class BlockSubscribe extends BasicService {
 
     _handleError(error) {
         stats.increment('block_subscribe_error');
-        logger.error(`BlockSubscribe websocket error - ${error}`);
+        Logger.error(`BlockSubscribe websocket error - ${error.stack}`);
         process.exit(1);
     }
 

@@ -1,4 +1,5 @@
 const Basic = require('./Basic');
+const ServiceMeta = require('../utils/ServiceMeta');
 
 /**
  * Базовый класс главного класса приложения.
@@ -24,6 +25,7 @@ class BasicMain extends Basic {
 
         this._stats = stats;
         this.stopOnExit();
+        this.throwOnUnhandledPromiseRejection();
     }
 
     async start() {
@@ -35,6 +37,12 @@ class BasicMain extends Basic {
         await this.stopNested();
         this._stats.increment('main_service_stop');
         process.exit(0);
+    }
+
+    defineMeta(meta) {
+        for (const key of Object.keys(meta)) {
+            ServiceMeta.set(key, meta[key]);
+        }
     }
 }
 

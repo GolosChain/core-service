@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const env = require('../data/env');
-const logger = require('../utils/Logger');
+const Logger = require('../utils/Logger');
 const BasicService = require('./Basic');
 const stats = require('../utils/statsClient');
 
@@ -58,7 +58,7 @@ class MongoDB extends BasicService {
      * окружения, либо по явно указанной строке подключеня.
      * @param {string/null} [forceConnectString] Строка подключения,
      * не обязательна.
-     * @returns {Promise<any>} Промис без экстра данных.
+     * @returns {Promise<*>} Промис без экстра данных.
      */
     async start(forceConnectString = null) {
         return new Promise(resolve => {
@@ -66,12 +66,12 @@ class MongoDB extends BasicService {
 
             connection.on('error', error => {
                 stats.increment('mongo_error');
-                logger.error(`MongoDB - ${error}`);
+                Logger.error(`MongoDB - ${error.stack}`);
                 process.exit(1);
             });
             connection.once('open', () => {
                 stats.increment('mongo_connected');
-                logger.info('MongoDB connection established.');
+                Logger.info('MongoDB connection established.');
                 resolve();
             });
 
@@ -85,7 +85,7 @@ class MongoDB extends BasicService {
      */
     async stop() {
         await mongoose.disconnect();
-        logger.info('MongoDB disconnected.');
+        Logger.info('MongoDB disconnected.');
     }
 }
 

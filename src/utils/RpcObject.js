@@ -7,7 +7,6 @@ const jayson = require('jayson');
  * (смотри класс services/Connector).
  */
 class RpcObject {
-
     /**
      * Сформировать успешный ответ.
      * @param {Object/null} result [Результат].

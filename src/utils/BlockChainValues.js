@@ -37,7 +37,7 @@ class BlockChainValues {
      * @param {Object} globalProperties
      * Сырой объект глобальных свойств блокчейна
      * (можно получить из метода getDynamicGlobalProperties из этого же класса).
-     * @returns {number} Результирующие значение.
+     * @returns {BigNum/BigNumber} Результирующие значение.
      */
     static vestsToGolos(vests, globalProperties) {
         vests = new BigNum(vests);

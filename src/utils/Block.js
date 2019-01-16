@@ -48,8 +48,12 @@ class Block {
      */
     static *eachRealOperation(block) {
         for (let transaction of this.eachTransaction(block)) {
-            for (let [type, data] of transaction.operations) {
-                yield [type, data];
+            for (let operationPack of transaction.operations) {
+                if (Array.isArray(operationPack)) {
+                    yield [operationPack[0], operationPack[1]];
+                } else {
+                    yield [operationPack.operationType, operationPack];
+                }
             }
         }
     }
@@ -77,6 +81,11 @@ class Block {
         }
 
         for (let virtual of block._virtual_operations) {
+            if (!virtual.op) {
+                yield [virtual.operationType, virtual];
+                continue;
+            }
+
             const operations = virtual.op;
 
             for (let i = 1; i < operations.length; i += 2) {
