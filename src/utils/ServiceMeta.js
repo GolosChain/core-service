@@ -13,7 +13,13 @@ class ServiceMeta {
      * @return {*} Хранящееся значение.
      */
     static get(key) {
-        return this._store[key];
+        let value = this._store[key];
+
+        if (!value && key === 'name') {
+            value = 'service';
+        }
+
+        return value;
     }
 
     /**

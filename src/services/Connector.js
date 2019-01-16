@@ -83,7 +83,12 @@ class Connector extends BasicService {
                     resolve(response);
                 }
 
-                this._reportStats(`${service}.${method}`, 'call', startTs, Boolean(error));
+                this._reportStats({
+                    method: `${service}.${method}`,
+                    type: 'call',
+                    startTs,
+                    isError: Boolean(error),
+                });
             });
         });
     }
@@ -143,13 +148,17 @@ class Connector extends BasicService {
                 this._handleHandlerError(callback, err);
             }
 
-            this._reportStats(route, 'handle', startTs, isError);
+            this._reportStats({
+                method: route,
+                type: 'handle',
+                startTs,
+                isError,
+            });
         };
     }
 
-    _reportStats(route, type, startTs, isError) {
+    _reportStats({ method, type, startTs, isError = false }) {
         const time = Date.now() - startTs;
-
         let status;
 
         if (isError) {
@@ -158,10 +167,10 @@ class Connector extends BasicService {
             status = 'success';
         }
 
-        const serviceName = ServiceMeta.get('name') || 'service';
+        const serviceName = ServiceMeta.get('name');
 
         const general = `${serviceName}:${type}_api_${status}`;
-        const detail = `${serviceName}:${type}_${route}_${status}`;
+        const detail = `${serviceName}:${type}_${method}_${status}`;
 
         stats.increment(`${general}_count`);
         stats.timing(`${general}_time`, time);

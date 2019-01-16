@@ -66,8 +66,7 @@ class MongoDB extends BasicService {
             const connection = mongoose.connection;
 
             connection.on('error', error => {
-                const serviceName = ServiceMeta.get('name') || 'service';
-                stats.increment(`${serviceName}:mongo_error`);
+                stats.increment(`${ServiceMeta.get('name')}:mongo_error`);
                 Logger.error(`MongoDB - ${error.stack}`);
                 process.exit(1);
             });
