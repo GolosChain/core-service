@@ -30,12 +30,12 @@ class BasicMain extends Basic {
 
     async start() {
         await this.startNested();
-        this._stats.increment('main_service_start');
+        this._stats.increment(`${ServiceMeta.get('name')}:main_service_start`);
     }
 
     async stop() {
         await this.stopNested();
-        this._stats.increment('main_service_stop');
+        this._stats.increment(`${ServiceMeta.get('name')}:main_service_stop`);
         process.exit(0);
     }
 

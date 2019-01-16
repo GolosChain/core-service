@@ -74,14 +74,40 @@ class Connector extends BasicService {
      */
     sendTo(service, method, data) {
         return new Promise((resolve, reject) => {
+            const startTs = Date.now();
+
             this._clientsMap.get(service).request(method, data, (error, response) => {
                 if (error) {
                     reject(error);
                 } else {
                     resolve(response);
                 }
+
+                this._reportStats({
+                    method: `${service}.${method}`,
+                    type: 'call',
+                    startTs,
+                    isError: Boolean(error),
+                });
             });
         });
+    }
+
+    /**
+     * Вызов метода микросервиса.
+     * @param {string} service Имя-алиас микросервиса.
+     * @param {string} method Метод JSON-RPC.
+     * @param {Object} params Параметры запроса.
+     * @returns {Promise<*>} Ответ.
+     */
+    async callService(service, method, params) {
+        const response = await this.sendTo(service, method, params);
+
+        if (response.error) {
+            throw response.error;
+        }
+
+        return response.result;
     }
 
     _startServer(rawRoutes) {
@@ -124,7 +150,7 @@ class Connector extends BasicService {
     _wrapMethod(route, originHandler) {
         return async (params, callback) => {
             const startTs = Date.now();
-            let isError = true;
+            let isError = false;
 
             try {
                 let data = await originHandler(params);
@@ -139,23 +165,33 @@ class Connector extends BasicService {
                 this._handleHandlerError(callback, err);
             }
 
-            this._reportStats(route, startTs, isError);
+            this._reportStats({
+                method: route,
+                type: 'handle',
+                startTs,
+                isError,
+            });
         };
     }
 
-    _reportStats(route, startTs, isError) {
+    _reportStats({ method, type, startTs, isError = false }) {
         const time = Date.now() - startTs;
-
-        let suffix = '';
+        let status;
 
         if (isError) {
-            suffix = '_error';
+            status = 'failure';
+        } else {
+            status = 'success';
         }
 
-        const serviceName = ServiceMeta.get('name') || 'service';
+        const serviceName = ServiceMeta.get('name');
+        const general = `${serviceName}:${type}_api_${status}`;
+        const details = `${serviceName}:${type}_${method}_${status}`;
 
-        stats.timing(`${serviceName}_api_call${suffix}`, time);
-        stats.timing(`${serviceName}_api_${route}${suffix}`, time);
+        stats.increment(`${general}_count`);
+        stats.timing(`${general}_time`, time);
+        stats.increment(`${details}_count`);
+        stats.timing(`${details}_time`, time);
     }
 
     _handleHandlerError(callback, error) {
