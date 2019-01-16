@@ -84,6 +84,23 @@ class Connector extends BasicService {
         });
     }
 
+    /**
+     * Вызов метода микросервиса.
+     * @param {string} service Имя-алиас микросервиса.
+     * @param {string} method Метод JSON-RPC.
+     * @param {Object} params Параметры запроса.
+     * @returns {Promise<*>} Ответ.
+     */
+    async callService(service, method, params) {
+        const response = await this.sendTo(service, method, params);
+
+        if (response.error) {
+            throw response.error;
+        }
+
+        return response.result;
+    }
+
     _startServer(rawRoutes) {
         return new Promise((resolve, reject) => {
             const routes = this._normalizeRoutes(rawRoutes);

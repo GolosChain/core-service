@@ -52,14 +52,22 @@ class Basic {
         }
     }
 
+    /**
+     * Шот-кат метод для работы с коннектором, в базовом представлении
+     * отправляет сообщение другому микросервису, но по своей сути
+     * просто вызывает аналогичный метод у коннектора.
+     * @param {string} service Имя-алиас микросервиса.
+     * @param {string} method Метод JSON-RPC.
+     * @param {Object} params Параметры запроса.
+     * @returns {Promise<*>} Ответ.
+     */
     async callService(service, method, params) {
-        const response = await this.sendTo(service, method, params);
-
-        if (response.error) {
-            throw response.error;
+        if (this.connector) {
+            return await this.connector.callService(service, method, params);
+        } else {
+            Logger.error('Basic controller - connector not defined');
+            throw 'Connector not defined';
         }
-
-        return response.result;
     }
 }
 
