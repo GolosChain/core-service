@@ -1,176 +1,84 @@
 const sleep = require('then-sleep');
+const nats = require('node-nats-streaming');
 const BasicService = require('./Basic');
-const Logger = require('../utils/Logger');
-const stats = require('../utils/statsClient');
 const env = require('../data/env');
+const Logger = require('../utils/Logger');
 
 /**
  * Сервис подписки получения новых блоков.
- * Подписывается на рассылку блоков от golos-ноды.
- * Каждый полученный блок сериализует и передает в эвенте
- * 'block', а в случае форка вызывается эвент 'fork'.
- * Альтернативно для получения данных блока можно
- * использовать callback-функцию.
+ * Подписывается на рассылку блоков от CyberWay-ноды.
+ * Каждый полученный блок сериализуется и передается
+ * в эвенте 'block', а в случае форка вызывается эвент 'fork'.
  */
 class BlockSubscribe extends BasicService {
-    constructor(lastBlockNum) {
+    constructor(startFromBlock) {
         super();
 
-        this._lastBlockNum = lastBlockNum;
-
-        this._callback = null;
-        this._blockQueue = [];
-        this._firstBlockNum = null;
-
-        this._irreversibleBlockNum = null;
-        this._previousBlockId = null;
+        this._startFromBlock = startFromBlock;
+        this._messageQueue = [];
+        this._pendingTransactionsBuffer = new Map();
+        this._connection = null;
     }
 
-    /**
-     * Вызывается в случае получения нового блока из блокчейна.
-     * @event block
-     * @property {Object} block Блок данных.
-     * @property {number} blockNum Номер блока.
-     */
-
-    /**
-     * Вызывается в случае обнаружения форка, оповещает о номере блока,
-     * с которого начинаются расхождения.
-     * После этого эвента подписчик прекращает свою работу.
-     * @event fork
-     * @property {number} irreversibleBlockNum Номер гарантированного неоткатного блока.
-     */
-
-    /**
-     * Эвент, вызываемый в начале при получении первого блока из подписки.
-     * @event firstBlockGet
-     * @property {number} blockNum Номер блока.
-     */
-
-    /**
-     * Эвент, вызываемый в момент готовности рассылки полученных блоков подписчикам.
-     * @event readyToNotify
-     * @property {number} blockNum Номер блока.
-     */
-
-    /**
-     * Запуск.
-     * @param {Function} callback Альтернтативный способ получения данных блока,
-     * повторяет апи эвента 'block'.
-     * @returns {Promise<void>} Промис без экстра данных.
-     */
-    async start(callback = null) {
-        this._callback = callback;
-
-        await this._runIrreversibleUpdateLoop();
-        this._runSubscribe();
-
-        this.on('readyToNotify', () => {
-            this._runNotifier().catch(error => {
-                Logger.error(`BlockSubscribe - notifier error ${error.stack}`);
-                process.exit(1);
-            });
-        });
-
-        this.on('firstBlockGet', blockNum => {
-            this._runBootRestore(blockNum).catch(error => {
-                Logger.error(`Cant handle first block - ${error.stack}`);
-                process.exit(1);
-            });
+    async start() {
+        this._connectToMessageBroker();
+        this._makeBlockHandlers();
+        this._restoreMissed();
+        this._startNotifier().catch(error => {
+            Logger.error(`Block notifier error - ${error}`);
+            process.exit(1);
         });
     }
 
-    _runSubscribe() {
-        this._callSubscriber((error, block) => {
-            const timer = new Date();
+    _connectToMessageBroker() {
+        this._connection = nats.connect(
+            env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
+            env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
+            env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT
+        );
+    }
 
-            if (error) {
-                Logger.error(`Block subscribe error - ${error.stack}`);
-                process.exit(1);
-            }
-
-            const blockNum = BlockUtils.extractBlockNum(block);
-
-            this._blockQueue.push([block, blockNum]);
-
-            stats.timing('block_subscribe_get_block', new Date() - timer);
-
-            if (!this._firstBlockNum) {
-                this._firstBlockNum = blockNum;
-                this.emit('firstBlockGet', blockNum);
-            }
+    _makeBlockHandlers() {
+        this._connection.on('connect', () => {
+            this._makeMessageHandler('ApplyTrx', this._handleTransactionApply.bind(this));
+            this._makeMessageHandler('AcceptBlock', this._handleBlockAccept.bind(this));
+        });
+        this._connection.on('close', () => {
+            Logger.error('Blockchain block broadcaster connection failed');
+            process.exit(1);
         });
     }
 
-    _callSubscriber(callback) {
-        golos.api.setBlockAppliedCallback('full', callback);
-    }
-
-    async _runBootRestore(blockNum) {
-        if (typeof this._lastBlockNum !== 'number') {
-            Logger.log('BlockSubscribe - last block num not defined, skip boot restore.');
-            this.emit('readyToNotify');
-            return;
-        }
-
-        if (blockNum === this._lastBlockNum) {
-            this._blockQueue.shift();
-            this.emit('readyToNotify');
-            return;
-        }
-
-        let currentBlock = blockNum;
-
-        while (--currentBlock > this._lastBlockNum) {
-            this._blockQueue.unshift(currentBlock);
-        }
-
-        Logger.info('BlockSubscribe - ready to start notify!');
-        this.emit('readyToNotify');
-    }
-
-    async _getBlock(blockNum) {
-        return await BlockUtils.getByNum(blockNum);
-    }
-
-    async _runIrreversibleUpdateLoop() {
+    async _handleTransactionApply() {
         try {
-            await this._updateIrreversibleBlockNum();
+            // TODO -
         } catch (error) {
-            Logger.error(`Cant load irreversible num, but continue - ${error.stack}`);
-            await sleep(1000);
-            await this._runIrreversibleUpdateLoop();
-            return;
-        }
-
-        setInterval(async () => {
-            try {
-                await this._updateIrreversibleBlockNum();
-            } catch (error) {
-                Logger.error(`Cant load irreversible num, but skip - ${error.stack}`);
-            }
-        }, env.GLS_IRREVERSIBLE_BLOCK_UPDATE_INTERVAL);
-    }
-
-    async _updateIrreversibleBlockNum() {
-        const props = await BlockChainValues.getDynamicGlobalProperties();
-        const irreversible = props.last_irreversible_block_num;
-
-        if (irreversible && typeof irreversible === 'number') {
-            this._irreversibleBlockNum = irreversible;
-        } else {
-            throw 'Invalid props format';
+            // TODO -
         }
     }
 
-    async _runNotifier() {
+    async _handleBlockAccept() {
+        try {
+            // TODO -
+        } catch (error) {
+            // TODO -
+        }
+    }
+
+    _makeMessageHandler(type, callback) {
+        const opts = this._connection.subscriptionOptions().setStartWithLastReceived();
+        const subscription = this._connection.subscribe(type, opts);
+
+        subscription.on('message', callback);
+    }
+
+    _restoreMissed() {
+        // TODO -
+    }
+
+    async _startNotifier() {
         while (true) {
-            const result = await this._notifyByQueue();
-
-            if (result === false) {
-                return;
-            }
-
+            await this._notifyByQueue();
             await sleep(0);
         }
     }
@@ -184,35 +92,7 @@ class BlockSubscribe extends BasicService {
     }
 
     async _notifyByItem(item) {
-        const [blockBody, blockNum] = await this._extractNotifierBlockData(item);
-
-        if (this._previousBlockId) {
-            if (blockBody.previous !== this._previousBlockId) {
-                this.emit('fork', this._irreversibleBlockNum);
-                return false;
-            }
-        }
-
-        this._previousBlockId = blockBody.block_id;
-
-        this.emit('block', blockBody, blockNum);
-
-        if (this._callback) {
-            this._callback(blockBody, blockNum);
-        }
-    }
-
-    async _extractNotifierBlockData(item) {
-        if (typeof item === 'number') {
-            const block = await this._getBlock(item);
-            const blockNum = BlockUtils.extractBlockNum(block);
-
-            Logger.info(`BlockSubscribe - restore block ${item}`);
-
-            return [block, blockNum];
-        } else {
-            return item;
-        }
+        // TODO -
     }
 }
 
