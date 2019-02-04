@@ -15,15 +15,16 @@ class BlockSubscribe extends BasicService {
         super();
 
         this._startFromBlock = startFromBlock;
-        this._messageQueue = [];
+        this._blockQueue = [];
         this._pendingTransactionsBuffer = new Map();
+        this._handledTransactionsBuffer = new Map();
+        this._handledBlocksBuffer = new Map();
         this._connection = null;
     }
 
     async start() {
         this._connectToMessageBroker();
         this._makeBlockHandlers();
-        this._restoreMissed();
         this._startNotifier().catch(error => {
             Logger.error(`Block notifier error - ${error}`);
             process.exit(1);
@@ -49,11 +50,23 @@ class BlockSubscribe extends BasicService {
         });
     }
 
-    async _handleTransactionApply() {
+    async _handleTransactionApply(message) {
         try {
-            // TODO -
+            const data = JSON.parse(message.getData());
+
+            for (const action of data.actions) {
+                if (action.data !== '') {
+                    // TODO Another detect 
+                    console.log(action.data);
+                    continue;
+                }
+
+                // TODO Store in buffer
+                console.log(action);
+            }
         } catch (error) {
-            // TODO -
+            Logger.error(`Handle transaction error - ${error}`);
+            process.exit(1);
         }
     }
 
@@ -61,19 +74,20 @@ class BlockSubscribe extends BasicService {
         try {
             // TODO -
         } catch (error) {
-            // TODO -
+            Logger.error(`Handle block error - ${error}`);
+            process.exit(1);
         }
     }
 
     _makeMessageHandler(type, callback) {
-        const opts = this._connection.subscriptionOptions().setStartWithLastReceived();
+        const delta = env.GLS_BLOCKCHAIN_BROADCASTER_REPLAY_TIME_DELTA;
+        const opts = this._connection
+            .subscriptionOptions()
+            .setStartWithLastReceived()
+            .setStartAtTimeDelta(delta);
         const subscription = this._connection.subscribe(type, opts);
 
         subscription.on('message', callback);
-    }
-
-    _restoreMissed() {
-        // TODO -
     }
 
     async _startNotifier() {
@@ -91,8 +105,10 @@ class BlockSubscribe extends BasicService {
         }
     }
 
-    async _notifyByItem(item) {
-        // TODO -
+    async _notifyByItem(block) {
+        if (block.num >= this._startFromBlock) {
+            this.emit('block', block);
+        }
     }
 }
 
