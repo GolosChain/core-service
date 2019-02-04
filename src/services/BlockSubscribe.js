@@ -174,7 +174,7 @@ class BlockSubscribe extends BasicService {
 
         setTimeout(() => {
             setInterval(() => {
-                this._removeOldDuplicateBlockFilters().catch((error) => {
+                this._removeOldDuplicateBlockFilters().catch(error => {
                     Logger.error(`Cant remove old dup block filters - ${error}`);
                     process.exit(1);
                 });
