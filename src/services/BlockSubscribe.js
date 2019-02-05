@@ -109,6 +109,7 @@ class BlockSubscribe extends BasicService {
 
             for (const { id } of block.trxs) {
                 transactions.push(this._pendingTransactionsBuffer.get(id));
+                this._pendingTransactionsBuffer.delete(id);
             }
 
             this._blockQueue.push({
