@@ -5,6 +5,7 @@ const env = require('../data/env');
 const Logger = require('../utils/Logger');
 
 // TODO Fork management
+// TODO Clean pending transactions buffer
 /**
  * Сервис подписки получения новых блоков.
  * Подписывается на рассылку блоков от CyberWay-ноды.
@@ -116,7 +117,6 @@ class BlockSubscribe extends BasicService {
                 transactions,
             });
 
-            this._pendingTransactionsBuffer.clear();
             this._handledBlocksBuffer.set(block.id, block.block_num);
         } catch (error) {
             Logger.error(`Handle block error - ${error.stack}`);

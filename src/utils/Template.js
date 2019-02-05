@@ -34,7 +34,7 @@ class Template {
                 this.makeFor(object[key]);
             }
         }
-        
+
         return object;
     }
 }
