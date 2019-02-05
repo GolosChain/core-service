@@ -14,6 +14,8 @@ const ServiceMeta = require('../utils/ServiceMeta');
  * этого базового класса клиента StatsD.
  * Дополнительно можно отправить env-объект для
  * автоматической печати переменных env в консоль.
+ * Метод boot запускается автоматически на статрте,
+ * перед запуском вложенных сервисаов.
  */
 class BasicMain extends Basic {
     constructor(stats, env = null) {
@@ -29,6 +31,7 @@ class BasicMain extends Basic {
     }
 
     async start() {
+        await this.boot();
         await this.startNested();
         this._stats.increment(`${ServiceMeta.get('name')}:main_service_start`);
     }
@@ -39,6 +42,10 @@ class BasicMain extends Basic {
         process.exit(0);
     }
 
+    /**
+     * Метод установки метаданных микросервиса.
+     * @param {Object} meta Любые необходимые данные (см. utils/ServiceMeta).
+     */
     defineMeta(meta) {
         for (const key of Object.keys(meta)) {
             ServiceMeta.set(key, meta[key]);
