@@ -53,7 +53,7 @@ class BlockSubscribe extends BasicService {
         this._makeBlockHandlers();
         this._makeCleaners();
         this._startNotifier().catch(error => {
-            Logger.error(`Block notifier error - ${error}`);
+            Logger.error(`Block notifier error - ${error.stack}`);
             process.exit(1);
         });
     }
@@ -87,7 +87,7 @@ class BlockSubscribe extends BasicService {
                 this._pendingTransactionsBuffer.set(transaction.id, action);
             }
         } catch (error) {
-            Logger.error(`Handle transaction error - ${error}`);
+            Logger.error(`Handle transaction error - ${error.stack}`);
             process.exit(1);
         }
     }
@@ -119,7 +119,7 @@ class BlockSubscribe extends BasicService {
             this._pendingTransactionsBuffer.clear();
             this._handledBlocksBuffer.set(block.id, block.block_num);
         } catch (error) {
-            Logger.error(`Handle block error - ${error}`);
+            Logger.error(`Handle block error - ${error.stack}`);
             process.exit(1);
         }
     }
@@ -141,7 +141,7 @@ class BlockSubscribe extends BasicService {
         try {
             data = JSON.parse(message.getData());
         } catch (error) {
-            Logger.error(`Invalid blockchain message - ${error}`);
+            Logger.error(`Invalid blockchain message - ${error.stack}`);
             process.exit(1);
         }
 
@@ -175,7 +175,7 @@ class BlockSubscribe extends BasicService {
         setTimeout(() => {
             setInterval(() => {
                 this._removeOldDuplicateBlockFilters().catch(error => {
-                    Logger.error(`Cant remove old dup block filters - ${error}`);
+                    Logger.error(`Cant remove old dup block filters - ${error.stack}`);
                     process.exit(1);
                 });
             }, interval);
