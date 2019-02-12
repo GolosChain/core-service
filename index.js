@@ -16,6 +16,7 @@ module.exports = {
         RpcObject: require('./src/utils/RpcObject'),
         statsClient: require('./src/utils/statsClient'),
         ServiceMeta: require('./src/utils/ServiceMeta'),
+        Content: require('./src/utils/Content'),
         defaultStarter: require('./src/utils/defaultStarter'),
     },
     types: {
