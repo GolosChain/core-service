@@ -6,6 +6,7 @@ const Logger = require('../utils/Logger');
 
 // TODO Fork management
 // TODO Clean pending transactions buffer
+// TODO Start from block where no empty transactions
 /**
  * Сервис подписки получения новых блоков.
  * Подписывается на рассылку блоков от CyberWay-ноды.
