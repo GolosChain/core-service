@@ -15,7 +15,7 @@ const BN = require('bignumber.js');
 class BigNum {
     /**
      * Возвращает класс оригинальной библиотеки bignumber.js.
-     * @return {{BigNumber}} Класс.
+     * @returns {{BigNumber}} Класс.
      */
     static OriginalBigNumber() {
         return BN;
@@ -25,7 +25,7 @@ class BigNum {
      * Конструктор, возвращающий прокси над bignumber.js.
      * @param {number|string|BigInt|BN} value Любое числоподобное
      * значение, включая значения с префиксами и постфиксами.
-     * @return {Proxy} Прокси.
+     * @returns {Proxy} Прокси.
      */
     constructor(value) {
         this._value = this._convertValue(value);
@@ -71,14 +71,14 @@ class BigNum {
     }
 
     /**
-     * @return {BN} Оригинальный инстанс bignumber.js.
+     * @returns {BN} Оригинальный инстанс bignumber.js.
      */
     rawValue() {
         return this._value;
     }
 
     /**
-     * @return {string} Значение, пригодное для BSON.
+     * @returns {string} Значение, пригодное для BSON.
      */
     toBSON() {
         return this._value.toString();

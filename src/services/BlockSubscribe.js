@@ -31,7 +31,7 @@ class BlockSubscribe extends BasicService {
      * Вызывается в случае получения нового блока из блокчейна.
      * @event block
      * @property {Object} block Блок из блокчейна.
-     * @property {String} block.id Идентификатор блока.
+     * @property {string} block.id Идентификатор блока.
      * @property {Number} block.blockNum Номер блока.
      * @property {Array<Object>} block.transactions Транзакции в оригинальном виде.
      */
@@ -48,7 +48,7 @@ class BlockSubscribe extends BasicService {
     /**
      * Запуск сервиса.
      * Предполагается что слушатели на эвенты установлены до запуска.
-     * @return {Promise<void>} Промис без экстра данных.
+     * @returns {Promise<void>} Промис без экстра данных.
      */
     async start() {
         this._connectToMessageBroker();
@@ -138,16 +138,12 @@ class BlockSubscribe extends BasicService {
     }
 
     _parseMessageData(message) {
-        let data;
-
         try {
-            data = JSON.parse(message.getData());
+            return JSON.parse(message.getData());
         } catch (error) {
             Logger.error(`Invalid blockchain message - ${error.stack}`);
             process.exit(1);
         }
-
-        return data;
     }
 
     async _startNotifier() {
@@ -174,13 +170,11 @@ class BlockSubscribe extends BasicService {
     _makeCleaners() {
         const interval = env.GLS_BLOCK_SUBSCRIBER_CLEANER_INTERVAL;
 
-        setTimeout(() => {
-            setInterval(() => {
-                this._removeOldDuplicateBlockFilters().catch(error => {
-                    Logger.error(`Cant remove old dup block filters - ${error.stack}`);
-                    process.exit(1);
-                });
-            }, interval);
+        setInterval(() => {
+            this._removeOldDuplicateBlockFilters().catch(error => {
+                Logger.error(`Cant remove old dup block filters - ${error.stack}`);
+                process.exit(1);
+            });
         }, interval);
     }
 

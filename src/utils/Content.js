@@ -8,7 +8,7 @@ class Content {
      * Очистить текст контента от лишних тегов.
      * Также заменяет тег H1 на H2 для более адекватного SEO.
      * @param {string} text Целевой текст.
-     * @return {string} Результат.
+     * @returns {string} Результат.
      */
     sanitize(text) {
         return sanitizer(text, {
@@ -49,7 +49,7 @@ class Content {
      * умно обрезает до нужной длинны и умно добавляет в конце троеточие.
      * @param {string} text Целевой текст.
      * @param {number} maxSize Максимальная длина результирующей строки.
-     * @return {string} Результат.
+     * @returns {string} Результат.
      */
     sanitizePreview(text, maxSize) {
         const sanitized = sanitizer(text, {
@@ -63,7 +63,7 @@ class Content {
      * Умно обрезает строку до нужной длинны и умно добавляет в конце троеточие.
      * @param {string} text Целевой текст.
      * @param {number} maxSize Максимальная длина результирующей строки.
-     * @return {string} Результат.
+     * @returns {string} Результат.
      */
     smartTrim(text, maxSize) {
         if (text.length <= maxSize) {
@@ -80,7 +80,7 @@ class Content {
      * Пытается умно обрезать строку до нужной длинны по точке.
      * @param {string} text Целевой текст.
      * @param {number} tolerance Уровень толлерантности при фильтрации.
-     * @return {string} Результат.
+     * @returns {string} Результат.
      */
     softTrimByDot(text, tolerance = 0.86) {
         const dotIndex = text.lastIndexOf('. ');
@@ -98,7 +98,7 @@ class Content {
      * и зачищает лишние пустые символы по краям.
      * @param {string} text Целевой текст.
      * @param {number} maxSize Максимальная длина результирующей строки.
-     * @return {string} Результат.
+     * @returns {string} Результат.
      */
     hardTrim(text, maxSize) {
         return text
@@ -110,7 +110,7 @@ class Content {
     /**
      * Умно добавляет в конец строки троеточие.
      * @param {string} text Целевой текст.
-     * @return {string} Результат.
+     * @returns {string} Результат.
      */
     makeEllipses(text) {
         return text.replace(/[,!?]?\s+[^\s]+$/, '…');

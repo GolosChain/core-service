@@ -90,7 +90,7 @@ class BasicMain extends Basic {
         }
 
         if (forRemove !== null) {
-            this._nestedServices.slice(forRemove, 1);
+            this._nestedServices.splice(forRemove, 1);
         }
     }
 
