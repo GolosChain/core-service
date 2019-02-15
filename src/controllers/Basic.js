@@ -29,7 +29,7 @@ class Basic {
 
     /**
      * Базовый метод любого контроллера, являющийся дефолтной входной точкой.
-     * @return {Promise<void>}
+     * @returns {Promise<void>}
      */
     async handle() {
         throw 'Not implemented';
@@ -41,7 +41,7 @@ class Basic {
      * просто вызывает аналогичный метод у коннектора из конструктора,
      * при его наличии.
      * @param args Произвольные аргументы.
-     * @return {Promise<*>} Ответ.
+     * @returns {Promise<*>} Ответ.
      */
     async sendTo(...args) {
         if (this.connector) {
