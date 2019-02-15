@@ -200,7 +200,6 @@ class Connector extends BasicService {
             RangeError,
             ReferenceError,
             SyntaxError,
-            TypeError,
             URIError,
         ]) {
             if (error instanceof InternalErrorType) {
