@@ -33,6 +33,7 @@ class BlockSubscribe extends BasicService {
      * @property {Object} block Блок из блокчейна.
      * @property {string} block.id Идентификатор блока.
      * @property {Number} block.blockNum Номер блока.
+     * @property {Date} block.blockTime Время блока.
      * @property {Array<Object>} block.transactions Транзакции в оригинальном виде.
      */
 
@@ -116,6 +117,7 @@ class BlockSubscribe extends BasicService {
             this._blockQueue.push({
                 id: block.id,
                 blockNum: block.block_num,
+                blockTime: new Date(block.block_time),
                 transactions,
             });
 
