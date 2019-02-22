@@ -82,21 +82,13 @@ class BlockSubscribe extends BasicService {
 
     async _handleTransactionApply(transaction) {
         try {
-            for (const action of transaction.actions) {
-                if (this._isOpaqueAction(action)) {
-                    continue;
-                }
+            transaction.actions = transaction.actions.filter(action => action.data === '');
 
-                this._pendingTransactionsBuffer.set(transaction.id, action);
-            }
+            this._pendingTransactionsBuffer.set(transaction.id, transaction);
         } catch (error) {
             Logger.error(`Handle transaction error - ${error.stack}`);
             process.exit(1);
         }
-    }
-
-    _isOpaqueAction(action) {
-        return action.data !== '';
     }
 
     async _handleBlockAccept(block) {
