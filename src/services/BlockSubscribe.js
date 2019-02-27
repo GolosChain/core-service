@@ -6,7 +6,6 @@ const Logger = require('../utils/Logger');
 
 // TODO Fork management
 // TODO Clean pending transactions buffer
-// TODO Start from block where no empty transactions
 /**
  * Сервис подписки получения новых блоков.
  * Подписывается на рассылку блоков от CyberWay-ноды.
@@ -25,6 +24,7 @@ class BlockSubscribe extends BasicService {
         this._handledBlocksBuffer = new Map();
         this._connection = null;
         this._currentBlockNum = Infinity;
+        this._isFirstBlock = true;
     }
 
     /**
@@ -91,33 +91,51 @@ class BlockSubscribe extends BasicService {
         }
     }
 
-    async _handleBlockAccept(block) {
-        if (!block.validated || this._handledBlocksBuffer.has(block.id)) {
+    async _handleBlockAccept(rawBlock) {
+        if (!rawBlock.validated || this._handledBlocksBuffer.has(rawBlock.id)) {
             return;
         }
 
+        this._currentBlockNum = rawBlock.block_num;
+
         try {
-            const transactions = [];
+            const transactions = this._extractPendingTransactions(rawBlock);
 
-            this._currentBlockNum = block.block_num;
+            if (this._isFirstBlock) {
+                this._isFirstBlock = false;
 
-            for (const { id } of block.trxs) {
-                transactions.push(this._pendingTransactionsBuffer.get(id));
-                this._pendingTransactionsBuffer.delete(id);
+                if (transactions.some(val => !val)) {
+                    // skip defective block
+                    return;
+                }
             }
 
-            this._blockQueue.push({
-                id: block.id,
-                blockNum: block.block_num,
-                blockTime: new Date(block.block_time),
-                transactions,
-            });
-
-            this._handledBlocksBuffer.set(block.id, block.block_num);
+            this._insertInQueue(rawBlock, transactions);
+            this._handledBlocksBuffer.set(rawBlock.id, rawBlock.block_num);
         } catch (error) {
             Logger.error(`Handle block error - ${error.stack}`);
             process.exit(1);
         }
+    }
+
+    _extractPendingTransactions(rawBlock) {
+        const transactions = [];
+
+        for (const { id } of rawBlock.trxs) {
+            transactions.push(this._pendingTransactionsBuffer.get(id));
+            this._pendingTransactionsBuffer.delete(id);
+        }
+
+        return transactions;
+    }
+
+    _insertInQueue(rawBlock, transactions) {
+        this._blockQueue.push({
+            id: rawBlock.id,
+            blockNum: rawBlock.block_num,
+            blockTime: new Date(rawBlock.block_time),
+            transactions,
+        });
     }
 
     _makeMessageHandler(type, callback) {
