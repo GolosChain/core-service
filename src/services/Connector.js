@@ -36,6 +36,8 @@ class Connector extends BasicService {
 
         this._server = null;
         this._clientsMap = new Map();
+        this._defaultResponse = { status: 'OK' };
+        this._useEmptyResponseCorrection = true;
     }
 
     /**
@@ -110,6 +112,48 @@ class Connector extends BasicService {
         return response.result;
     }
 
+    /**
+     * Получить текущее значение, которое возвращается
+     * в ответе в случае если ответ пуст (эквивалентен false)
+     * или равен 'Ok' (legacy).
+     * Дефолтное значение - { status: 'OK' }.
+     * @return {*} Значение.
+     */
+    getDefaultResponse() {
+        return this._defaultResponse;
+    }
+
+    /**
+     * Установить значение, которое возвращается
+     * в ответе в случае если ответ пуст (эквивалентен false)
+     * или равен 'Ok' (legacy).
+     * Дефолтное значение - { status: 'OK' }.
+     * @param {*} value Значение.
+     */
+    setDefaultResponse(value) {
+        this._defaultResponse = value;
+    }
+
+    /**
+     * Включить коррекцию ответа в случае пустого ответа
+     * (эквивалентного false), которая заменяет пустой ответ
+     * на дефолтный (например на { status: 'OK' }).
+     * Изначально включено.
+     */
+    enableEmptyResponseCorrection() {
+        this._useEmptyResponseCorrection = true;
+    }
+
+    /**
+     * Выключить коррекцию ответа в случае пустого ответа
+     * (эквивалентного false), которая заменяет пустой ответ
+     * на дефолтный (например на { status: 'OK' }).
+     * Изначально включено.
+     */
+    disableEmptyResponseCorrection() {
+        this._useEmptyResponseCorrection = false;
+    }
+
     _startServer(rawRoutes) {
         return new Promise((resolve, reject) => {
             const routes = this._normalizeRoutes(rawRoutes);
@@ -155,8 +199,8 @@ class Connector extends BasicService {
             try {
                 let data = await originHandler(params);
 
-                if (!data || data === 'Ok') {
-                    data = { status: 'OK' };
+                if (this._useEmptyResponseCorrection && (!data || data === 'Ok')) {
+                    data = this._defaultResponse;
                 }
 
                 callback(null, data);
