@@ -102,7 +102,15 @@ class GateClient {
     }
 
     _logResponse(message, type) {
-        Logger[type](`${message.id} - ${JSON.stringify(message.result)}`);
+        let data;
+
+        if (type === 'error') {
+            data = message.error;
+        } else {
+            data = message.result;
+        }
+
+        Logger[type](`${message.id} - ${JSON.stringify(data)}`);
     }
 
     _notify(message) {

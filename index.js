@@ -18,7 +18,7 @@ module.exports = {
         ServiceMeta: require('./src/utils/ServiceMeta'),
         Content: require('./src/utils/Content'),
         defaultStarter: require('./src/utils/defaultStarter'),
-        gateClient: require('./src/utils/GateClient'),
+        GateClient: require('./src/utils/GateClient'),
     },
     types: {
         BigNum: require('./src/types/BigNum'),
