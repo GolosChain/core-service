@@ -14,6 +14,16 @@ const Logger = require('../utils/Logger');
  * Текущая версия не поддерживает 'fork'!
  */
 class BlockSubscribe extends BasicService {
+    /**
+     * @param {number} startFromBlock
+     * Номер блока, с которого нужно начать подписку.
+     * Более ранние блоки будут проигнорированны.
+     * В случае если очередь блокчейн-ноды уже не хранит необходимые
+     * старые блоки - блоки могут быть пропущены (в текущей версии).
+     * @param {boolean} onlyIrreversible
+     * В случае true эвенты будут возвращать только неоткатные блоки,
+     * игнорируя те блоки что блокчейн ещё не пометил неоткатными.
+     */
     constructor(startFromBlock = 0, { onlyIrreversible = false } = {}) {
         super();
 
