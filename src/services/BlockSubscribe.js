@@ -5,7 +5,6 @@ const env = require('../data/env');
 const Logger = require('../utils/Logger');
 
 // TODO Fork management
-// TODO Clean pending transactions buffer
 /**
  * Сервис подписки получения новых блоков.
  * Подписывается на рассылку блоков от CyberWay-ноды.
@@ -15,16 +14,18 @@ const Logger = require('../utils/Logger');
  * Текущая версия не поддерживает 'fork'!
  */
 class BlockSubscribe extends BasicService {
-    constructor(startFromBlock = 0) {
+    constructor(startFromBlock = 0, { onlyIrreversible = false } = {}) {
         super();
 
         this._startFromBlock = startFromBlock;
         this._blockQueue = [];
+        this._reversibleBlockBuffer = [];
         this._pendingTransactionsBuffer = new Map();
         this._handledBlocksBuffer = new Map();
         this._connection = null;
         this._currentBlockNum = Infinity;
         this._isFirstBlock = true;
+        this._onlyIrreversible = onlyIrreversible;
     }
 
     /**
@@ -32,7 +33,7 @@ class BlockSubscribe extends BasicService {
      * @event block
      * @property {Object} block Блок из блокчейна.
      * @property {string} block.id Идентификатор блока.
-     * @property {Number} block.blockNum Номер блока.
+     * @property {number} block.blockNum Номер блока.
      * @property {Date} block.blockTime Время блока.
      * @property {Array<Object>} block.transactions Транзакции в оригинальном виде.
      */
@@ -44,6 +45,12 @@ class BlockSubscribe extends BasicService {
      * с которого начинаются расхождения.
      * После этого эвента подписчик прекращает свою работу.
      * @event fork
+     */
+
+    /**
+     * Оповещает об текущем номере неоткатного блока.
+     * @property {number} irreversibleBlockNum Номер неоткатного блока.
+     * @event irreversibleBlockNum
      */
 
     /**
@@ -73,6 +80,7 @@ class BlockSubscribe extends BasicService {
         this._connection.on('connect', () => {
             this._makeMessageHandler('ApplyTrx', this._handleTransactionApply.bind(this));
             this._makeMessageHandler('AcceptBlock', this._handleBlockAccept.bind(this));
+            this._makeMessageHandler('CommitBlock', this._handleBlockCommit.bind(this));
         });
         this._connection.on('close', () => {
             Logger.error('Blockchain block broadcaster connection failed');
@@ -118,6 +126,26 @@ class BlockSubscribe extends BasicService {
         }
     }
 
+    // do not make this method async, synchronous algorithm
+    _handleBlockCommit({ block_num: irreversibleNum }) {
+        this.emit('irreversibleBlockNum', irreversibleNum);
+
+        if (!this._onlyIrreversible) {
+            return;
+        }
+
+        let block;
+
+        while ((block = this._reversibleBlockBuffer.shift())) {
+            if (block.blockNum <= irreversibleNum) {
+                this._blockQueue.push(block);
+            } else {
+                this._reversibleBlockBuffer.unshift(block);
+                break;
+            }
+        }
+    }
+
     _extractPendingTransactions(rawBlock) {
         const transactions = [];
 
@@ -130,7 +158,15 @@ class BlockSubscribe extends BasicService {
     }
 
     _insertInQueue(rawBlock, transactions) {
-        this._blockQueue.push({
+        let queue;
+
+        if (this._onlyIrreversible) {
+            queue = this._reversibleBlockBuffer;
+        } else {
+            queue = this._blockQueue;
+        }
+
+        queue.push({
             id: rawBlock.id,
             blockNum: rawBlock.block_num,
             blockTime: new Date(rawBlock.block_time),
@@ -176,6 +212,8 @@ class BlockSubscribe extends BasicService {
     async _notifyByItem(block) {
         if (block.blockNum >= this._startFromBlock) {
             this.emit('block', block);
+        } else {
+            Logger.log(`Skip outdated block ${block.blockNum}`);
         }
     }
 
