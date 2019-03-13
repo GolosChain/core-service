@@ -1,179 +1,202 @@
 const sleep = require('then-sleep');
+const nats = require('node-nats-streaming');
 const BasicService = require('./Basic');
-const golos = require('golos-js');
-const BlockUtils = require('../utils/Block');
-const BlockChainValues = require('../utils/BlockChainValues');
-const Logger = require('../utils/Logger');
-const stats = require('../utils/statsClient');
 const env = require('../data/env');
+const Logger = require('../utils/Logger');
 
+// TODO Fork management
 /**
  * Сервис подписки получения новых блоков.
- * Подписывается на рассылку блоков от golos-ноды.
- * Каждый полученный блок сериализует и передает в эвенте
- * 'block', а в случае форка вызывается эвент 'fork'.
- * Альтернативно для получения данных блока можно
- * использовать callback-функцию.
+ * Подписывается на рассылку блоков от CyberWay-ноды.
+ * Каждый полученный блок сериализуется и передается
+ * в эвенте 'block', а в случае форка вызывается эвент 'fork'.
+ *
+ * Текущая версия не поддерживает 'fork'!
  */
 class BlockSubscribe extends BasicService {
-    constructor(lastBlockNum) {
+    constructor(startFromBlock = 0, { onlyIrreversible = false } = {}) {
         super();
 
-        this._lastBlockNum = lastBlockNum;
-
-        this._callback = null;
+        this._startFromBlock = startFromBlock;
         this._blockQueue = [];
-        this._firstBlockNum = null;
-
-        this._irreversibleBlockNum = null;
-        this._previousBlockId = null;
+        this._reversibleBlockBuffer = [];
+        this._pendingTransactionsBuffer = new Map();
+        this._handledBlocksBuffer = new Map();
+        this._connection = null;
+        this._currentBlockNum = Infinity;
+        this._isFirstBlock = true;
+        this._onlyIrreversible = onlyIrreversible;
     }
 
     /**
      * Вызывается в случае получения нового блока из блокчейна.
      * @event block
-     * @property {Object} block Блок данных.
-     * @property {number} blockNum Номер блока.
+     * @property {Object} block Блок из блокчейна.
+     * @property {string} block.id Идентификатор блока.
+     * @property {number} block.blockNum Номер блока.
+     * @property {Date} block.blockTime Время блока.
+     * @property {Array<Object>} block.transactions Транзакции в оригинальном виде.
      */
 
     /**
+     * Не работает в текущей версии!
+     *
      * Вызывается в случае обнаружения форка, оповещает о номере блока,
      * с которого начинаются расхождения.
      * После этого эвента подписчик прекращает свою работу.
      * @event fork
-     * @property {number} irreversibleBlockNum Номер гарантированного неоткатного блока.
      */
 
     /**
-     * Эвент, вызываемый в начале при получении первого блока из подписки.
-     * @event firstBlockGet
-     * @property {number} blockNum Номер блока.
+     * Оповещает об текущем номере неоткатного блока.
+     * @property {number} irreversibleBlockNum Номер неоткатного блока.
+     * @event irreversibleBlockNum
      */
 
     /**
-     * Эвент, вызываемый в момент готовности рассылки полученных блоков подписчикам.
-     * @event readyToNotify
-     * @property {number} blockNum Номер блока.
-     */
-
-    /**
-     * Запуск.
-     * @param {Function} callback Альтернтативный способ получения данных блока,
-     * повторяет апи эвента 'block'.
+     * Запуск сервиса.
+     * Предполагается что слушатели на эвенты установлены до запуска.
      * @returns {Promise<void>} Промис без экстра данных.
      */
-    async start(callback = null) {
-        this._callback = callback;
-
-        await this._runIrreversibleUpdateLoop();
-        this._runSubscribe();
-
-        this.on('readyToNotify', () => {
-            this._runNotifier().catch(error => {
-                Logger.error(`BlockSubscribe - notifier error ${error.stack}`);
-                process.exit(1);
-            });
-        });
-
-        this.on('firstBlockGet', blockNum => {
-            this._runBootRestore(blockNum).catch(error => {
-                Logger.error(`Cant handle first block - ${error.stack}`);
-                process.exit(1);
-            });
+    async start() {
+        this._connectToMessageBroker();
+        this._makeBlockHandlers();
+        this._makeCleaners();
+        this._startNotifier().catch(error => {
+            Logger.error(`Block notifier error - ${error.stack}`);
+            process.exit(1);
         });
     }
 
-    _runSubscribe() {
-        this._callSubscriber((error, block) => {
-            const timer = new Date();
+    _connectToMessageBroker() {
+        this._connection = nats.connect(
+            env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
+            env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
+            env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT
+        );
+    }
 
-            if (error) {
-                Logger.error(`Block subscribe error - ${error.stack}`);
-                process.exit(1);
-            }
-
-            const blockNum = BlockUtils.extractBlockNum(block);
-
-            this._blockQueue.push([block, blockNum]);
-
-            stats.timing('block_subscribe_get_block', new Date() - timer);
-
-            if (!this._firstBlockNum) {
-                this._firstBlockNum = blockNum;
-                this.emit('firstBlockGet', blockNum);
-            }
+    _makeBlockHandlers() {
+        this._connection.on('connect', () => {
+            this._makeMessageHandler('ApplyTrx', this._handleTransactionApply.bind(this));
+            this._makeMessageHandler('AcceptBlock', this._handleBlockAccept.bind(this));
+            this._makeMessageHandler('CommitBlock', this._handleBlockCommit.bind(this));
+        });
+        this._connection.on('close', () => {
+            Logger.error('Blockchain block broadcaster connection failed');
+            process.exit(1);
         });
     }
 
-    _callSubscriber(callback) {
-        golos.api.setBlockAppliedCallback('full', callback);
-    }
-
-    async _runBootRestore(blockNum) {
-        if (typeof this._lastBlockNum !== 'number') {
-            Logger.log('BlockSubscribe - last block num not defined, skip boot restore.');
-            this.emit('readyToNotify');
-            return;
-        }
-
-        if (blockNum === this._lastBlockNum) {
-            this._blockQueue.shift();
-            this.emit('readyToNotify');
-            return;
-        }
-
-        let currentBlock = blockNum;
-
-        while (--currentBlock > this._lastBlockNum) {
-            this._blockQueue.unshift(currentBlock);
-        }
-
-        Logger.info('BlockSubscribe - ready to start notify!');
-        this.emit('readyToNotify');
-    }
-
-    async _getBlock(blockNum) {
-        return await BlockUtils.getByNum(blockNum);
-    }
-
-    async _runIrreversibleUpdateLoop() {
+    async _handleTransactionApply(transaction) {
         try {
-            await this._updateIrreversibleBlockNum();
+            transaction.actions = transaction.actions.filter(action => action.data === '');
+
+            this._pendingTransactionsBuffer.set(transaction.id, transaction);
         } catch (error) {
-            Logger.error(`Cant load irreversible num, but continue - ${error.stack}`);
-            await sleep(1000);
-            await this._runIrreversibleUpdateLoop();
+            Logger.error(`Handle transaction error - ${error.stack}`);
+            process.exit(1);
+        }
+    }
+
+    async _handleBlockAccept(rawBlock) {
+        if (!rawBlock.validated || this._handledBlocksBuffer.has(rawBlock.id)) {
             return;
         }
 
-        setInterval(async () => {
-            try {
-                await this._updateIrreversibleBlockNum();
-            } catch (error) {
-                Logger.error(`Cant load irreversible num, but skip - ${error.stack}`);
+        this._currentBlockNum = rawBlock.block_num;
+
+        try {
+            const transactions = this._extractPendingTransactions(rawBlock);
+
+            if (this._isFirstBlock) {
+                this._isFirstBlock = false;
+
+                if (transactions.some(val => !val)) {
+                    // skip defective block
+                    return;
+                }
             }
-        }, env.GLS_IRREVERSIBLE_BLOCK_UPDATE_INTERVAL);
-    }
 
-    async _updateIrreversibleBlockNum() {
-        const props = await BlockChainValues.getDynamicGlobalProperties();
-        const irreversible = props.last_irreversible_block_num;
-
-        if (irreversible && typeof irreversible === 'number') {
-            this._irreversibleBlockNum = irreversible;
-        } else {
-            throw 'Invalid props format';
+            this._insertInQueue(rawBlock, transactions);
+            this._handledBlocksBuffer.set(rawBlock.id, rawBlock.block_num);
+        } catch (error) {
+            Logger.error(`Handle block error - ${error.stack}`);
+            process.exit(1);
         }
     }
 
-    async _runNotifier() {
-        while (true) {
-            const result = await this._notifyByQueue();
+    // do not make this method async, synchronous algorithm
+    _handleBlockCommit({ block_num: irreversibleNum }) {
+        this.emit('irreversibleBlockNum', irreversibleNum);
 
-            if (result === false) {
-                return;
+        if (!this._onlyIrreversible) {
+            return;
+        }
+
+        let block;
+
+        while ((block = this._reversibleBlockBuffer.shift())) {
+            if (block.blockNum <= irreversibleNum) {
+                this._blockQueue.push(block);
+            } else {
+                this._reversibleBlockBuffer.unshift(block);
+                break;
             }
+        }
+    }
 
+    _extractPendingTransactions(rawBlock) {
+        const transactions = [];
+
+        for (const { id } of rawBlock.trxs) {
+            transactions.push(this._pendingTransactionsBuffer.get(id));
+            this._pendingTransactionsBuffer.delete(id);
+        }
+
+        return transactions;
+    }
+
+    _insertInQueue(rawBlock, transactions) {
+        let queue;
+
+        if (this._onlyIrreversible) {
+            queue = this._reversibleBlockBuffer;
+        } else {
+            queue = this._blockQueue;
+        }
+
+        queue.push({
+            id: rawBlock.id,
+            blockNum: rawBlock.block_num,
+            blockTime: new Date(rawBlock.block_time),
+            transactions,
+        });
+    }
+
+    _makeMessageHandler(type, callback) {
+        const delta = env.GLS_BLOCK_SUBSCRIBER_REPLAY_TIME_DELTA;
+        const opts = this._connection
+            .subscriptionOptions()
+            .setStartWithLastReceived()
+            .setStartAtTimeDelta(delta);
+        const subscription = this._connection.subscribe(type, opts);
+
+        subscription.on('message', message => callback.call(this, this._parseMessageData(message)));
+    }
+
+    _parseMessageData(message) {
+        try {
+            return JSON.parse(message.getData());
+        } catch (error) {
+            Logger.error(`Invalid blockchain message - ${error.stack}`);
+            process.exit(1);
+        }
+    }
+
+    async _startNotifier() {
+        while (true) {
+            await this._notifyByQueue();
             await sleep(0);
         }
     }
@@ -186,35 +209,33 @@ class BlockSubscribe extends BasicService {
         }
     }
 
-    async _notifyByItem(item) {
-        const [blockBody, blockNum] = await this._extractNotifierBlockData(item);
-
-        if (this._previousBlockId) {
-            if (blockBody.previous !== this._previousBlockId) {
-                this.emit('fork', this._irreversibleBlockNum);
-                return false;
-            }
-        }
-
-        this._previousBlockId = blockBody.block_id;
-
-        this.emit('block', blockBody, blockNum);
-
-        if (this._callback) {
-            this._callback(blockBody, blockNum);
+    async _notifyByItem(block) {
+        if (block.blockNum >= this._startFromBlock) {
+            this.emit('block', block);
+        } else {
+            Logger.log(`Skip outdated block ${block.blockNum}`);
         }
     }
 
-    async _extractNotifierBlockData(item) {
-        if (typeof item === 'number') {
-            const block = await this._getBlock(item);
-            const blockNum = BlockUtils.extractBlockNum(block);
+    _makeCleaners() {
+        const interval = env.GLS_BLOCK_SUBSCRIBER_CLEANER_INTERVAL;
 
-            Logger.info(`BlockSubscribe - restore block ${item}`);
+        setInterval(() => {
+            this._removeOldDuplicateBlockFilters().catch(error => {
+                Logger.error(`Cant remove old dup block filters - ${error.stack}`);
+                process.exit(1);
+            });
+        }, interval);
+    }
 
-            return [block, blockNum];
-        } else {
-            return item;
+    async _removeOldDuplicateBlockFilters() {
+        const lastBlockStore = env.GLS_BLOCK_SUBSCRIBER_LAST_BLOCK_STORE;
+
+        for (const [id, blockNum] of this._handledBlocksBuffer) {
+            if (blockNum < this._currentBlockNum - lastBlockStore) {
+                this._handledBlocksBuffer.delete(id);
+            }
+            await sleep(0);
         }
     }
 }
