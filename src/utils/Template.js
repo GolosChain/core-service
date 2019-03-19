@@ -10,7 +10,7 @@ class Template {
      * Результат можно вызвать ещё раз передав параметры
      * для подстановки. Детально можно посмотреть в
      * документации Lodash для метода template.
-     * @param {String} string Строка-шаблон.
+     * @param {string} string Строка-шаблон.
      * @returns {Function} Шаблон-функция.
      */
     static make(string) {
@@ -24,7 +24,7 @@ class Template {
      * Предполагается что вложенные объекты являются объектами
      * или поддерживают Object.keys(inner).
      * @param {Object} object Целевой объект.
-     * @return {Object} object Целевой объект.
+     * @returns {Object} object Целевой объект.
      */
     static makeFor(object) {
         for (let key of Object.keys(object)) {
@@ -34,7 +34,7 @@ class Template {
                 this.makeFor(object[key]);
             }
         }
-        
+
         return object;
     }
 }

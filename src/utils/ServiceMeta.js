@@ -10,7 +10,7 @@ class ServiceMeta {
     /**
      * Получить мета-данные.
      * @param {string} key Ключ.
-     * @return {*} Хранящееся значение.
+     * @returns {*} Хранящееся значение.
      */
     static get(key) {
         const value = this._store[key];
