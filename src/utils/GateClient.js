@@ -33,8 +33,8 @@ class GateClient {
 
     /**
      * Производит стандартную операцию авторизации в CyberWay.
-     * @param {String} [userId] Идентификатор пользователя.
-     * @param {String} [privateKey] Приватный ключ пользователя,
+     * @param {String} userId Идентификатор пользователя.
+     * @param {String} privateKey Приватный ключ пользователя,
      * ключ не передается на сервер.
      * @return {Promise<Object>} Ответ авторизации.
      */

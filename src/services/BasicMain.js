@@ -80,18 +80,14 @@ class BasicMain extends Basic {
     }
 
     _tryExcludeMongoFromNested() {
-        let forRemove = null;
-
-        for (let i = 0; i < this._nestedServices.length; i++) {
-            if (this._nestedServices[i] instanceof MongoDB) {
+        this._nestedServices = this._nestedServices.filter(service => {
+            if (service instanceof MongoDB) {
                 Logger.warn('Exclude MongoDB from nested services - startMongoBeforeBoot used');
-                forRemove = i;
+                return false;
+            } else {
+                return true;
             }
-        }
-
-        if (forRemove !== null) {
-            this._nestedServices.splice(forRemove, 1);
-        }
+        });
     }
 
     _tryIncludeMongoToNested() {
