@@ -12,7 +12,7 @@ const Logger = require('./Logger');
  */
 class GateClient {
     /**
-     * @param {String} connectString Строка подключения к гейту.
+     * @param {string} connectString Строка подключения к гейту.
      */
     constructor(connectString) {
         this._connectString = connectString;
@@ -33,8 +33,8 @@ class GateClient {
 
     /**
      * Производит стандартную операцию авторизации в CyberWay.
-     * @param {String} userId Идентификатор пользователя.
-     * @param {String} privateKey Приватный ключ пользователя,
+     * @param {string} userId Идентификатор пользователя.
+     * @param {string} privateKey Приватный ключ пользователя,
      * ключ не передается на сервер.
      * @return {Promise<Object>} Ответ авторизации.
      */
@@ -54,7 +54,7 @@ class GateClient {
 
     /**
      * Отправка запроса.
-     * @param {String} point RPC-метод.
+     * @param {string} point RPC-метод.
      * @param {Object} [data] Передаваемые данные, опционально.
      * @param {Number} [id] Идентификатор запроса, если не указан - генерируется случайно.
      * @return {Promise<Object>} Ответ из гейта.
@@ -75,9 +75,9 @@ class GateClient {
     /**
      * Непосредственная отправка JSON-RPC запроса по сокету.
      * Не возвращает результата.
-     * @param {String} point RPC-метод.
+     * @param {string} point RPC-метод.
      * @param {Object} data Передаваемые данные.
-     * @param {String} id Идентификатор запроса, в случае отсутствия
+     * @param {string} id Идентификатор запроса, в случае отсутствия
      * будет идентифицированно как RPC-нотификация без ожидания ответа.
      */
     sendRaw(point, data, id) {
