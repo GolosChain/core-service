@@ -113,6 +113,17 @@ class Connector extends BasicService {
     }
 
     /**
+     * Динамически добавляет сервис к списку известных сервисов.
+     * @param {string} service Имя-алиас микросервиса.
+     * @param {string} connectString Строка подключения.
+     */
+    addService(service, connectString) {
+        const client = new jayson.client.http(connectString);
+
+        this._clientsMap.set(service, client);
+    }
+
+    /**
      * Получить текущее значение, которое возвращается
      * в ответе в случае если ответ пуст (эквивалентен false)
      * или равен 'Ok' (legacy).
@@ -174,10 +185,7 @@ class Connector extends BasicService {
 
     _makeClients(requiredClients) {
         for (let alias of Object.keys(requiredClients)) {
-            const connectString = requiredClients[alias];
-            const client = new jayson.client.http(connectString);
-
-            this._clientsMap.set(alias, client);
+            this.addService(alias, requiredClients[alias]);
         }
     }
 
