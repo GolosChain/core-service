@@ -1,3 +1,5 @@
+const Ajv = require('ajv');
+const ajv = new Ajv();
 const jayson = require('jayson');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
@@ -10,13 +12,34 @@ const ServiceMeta = require('../utils/ServiceMeta');
  * При необходимости поднимает сервер обработки входящих подключений и/или
  * обработчики запросов исходящих запросов.
  * Работает посредством JSON-RPC.
- * Сервер связи конфигурируется объектом роутинга вида:
+ * Сервер связи конфигурируется объектом роутинга в двух вариациях.
  *
- *  ```
- *  transfer: (data) => handler(data),
- *  history: this._handler.bind(this),
- *  ...
- *  ```
+ * Лаконичная:
+ *
+ * ```
+ * transfer: (data) => handler(data),
+ * history: this._handler.bind(this),
+ * ...
+ * ```
+ *
+ * Полная и с валидацией:
+ *
+ * ```
+ * transfer: {
+ *     handler: this._handler,  // Обработчик вызова
+ *     scope: this,             // Скоуп вызова обработчика
+ *     validation: {            // ajv-схема валидации параметров
+ *         type: 'object',
+ *         additionalProperties: false,
+ *         required: ['name'],
+ *         properties: {
+ *             name: { type: 'string' },
+ *             count: { type: 'number' },
+ *         }
+ *     }
+ * }
+ * ...
+ * ```
  *
  * В обработчик попадает объект из params JSON-RPC.
  *
@@ -195,10 +218,18 @@ class Connector extends BasicService {
         for (const route of Object.keys(originalRoutes)) {
             const originHandler = originalRoutes[route];
 
+            this._tryApplyValidator(originHandler);
+
             routes[route] = this._wrapMethod(route, originHandler);
         }
 
         return routes;
+    }
+
+    _tryApplyValidator(handler) {
+        if (handler && typeof handler !== 'function' && typeof handler.validation === 'object') {
+            handler.validator = ajv.compile(handler.validation);
+        }
     }
 
     _wrapMethod(route, originHandler) {
@@ -207,7 +238,13 @@ class Connector extends BasicService {
             let isError = false;
 
             try {
-                let data = await originHandler(params);
+                let data;
+
+                if (typeof originHandler === 'function') {
+                    data = await originHandler(params);
+                } else {
+                    data = await this._handleWithOptions(originHandler, params);
+                }
 
                 if (this._useEmptyResponseCorrection && (!data || data === 'Ok')) {
                     data = this._defaultResponse;
@@ -226,6 +263,20 @@ class Connector extends BasicService {
                 isError,
             });
         };
+    }
+
+    async _handleWithOptions(config, params) {
+        const { handler, scope, validator } = config;
+
+        if (validator) {
+            const isValid = validator(params);
+
+            if (!isValid) {
+                throw { code: 400, message: ajv.errorsText(validator.errors) };
+            }
+        }
+
+        await handler.call(scope || {}, params);
     }
 
     _reportStats({ method, type, startTs, isError = false }) {
