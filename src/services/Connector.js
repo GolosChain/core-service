@@ -1,5 +1,5 @@
 const Ajv = require('ajv');
-const ajv = new Ajv();
+const ajv = new Ajv({ useDefaults: true });
 const jayson = require('jayson');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
