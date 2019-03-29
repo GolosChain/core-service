@@ -130,7 +130,7 @@ class Content {
      */
     extractHashTags(text) {
         const tags = new Set();
-        const extracted = text.match(/\s[#][\w_-]+/gi);
+        const extracted = text.match(/\s#[\w_-]+|^#[\w_-]+/gi);
 
         if (!extracted) {
             return [];
