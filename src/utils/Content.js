@@ -5,6 +5,13 @@ const sanitizer = require('sanitize-html');
  */
 class Content {
     /**
+     * @param {number} maxHashTagSize Максимальный размер хеш-тега.
+     */
+    constructor({ maxHashTagSize = Infinity } = {}) {
+        this._maxHashTagSize = maxHashTagSize;
+    }
+
+    /**
      * Очистить текст контента от лишних тегов.
      * Также заменяет тег H1 на H2 для более адекватного SEO.
      * @param {string} text Целевой текст.
@@ -114,6 +121,30 @@ class Content {
      */
     makeEllipses(text) {
         return text.replace(/[,!?]?\s+[^\s]+$/, '…');
+    }
+
+    /**
+     * Извлекает из текста хеш-теги, без повторений.
+     * @param {string} text Исходный текст.
+     * @return {[string]} Массив тегов.
+     */
+    extractHashTags(text) {
+        const tags = new Set();
+        const extracted = text.match(/\s#[\w_-]+|^#[\w_-]+/gi);
+
+        if (!extracted) {
+            return [];
+        }
+
+        for (const rawTag of extracted) {
+            const tag = rawTag.trim().slice(1);
+
+            if (tag.length <= this._maxHashTagSize) {
+                tags.add(tag);
+            }
+        }
+
+        return Array.from(tags);
     }
 }
 
