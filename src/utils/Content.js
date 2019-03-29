@@ -136,13 +136,13 @@ class Content {
             return [];
         }
 
-        extracted.forEach(tag => {
-            tag = tag.trim().slice(1);
+        for (const rawTag of extracted) {
+            const tag = rawTag.trim().slice(1);
 
             if (tag.length <= this._maxHashTagSize) {
                 tags.add(tag);
             }
-        });
+        }
 
         return Array.from(tags);
     }
