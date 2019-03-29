@@ -276,7 +276,7 @@ class Connector extends BasicService {
             }
         }
 
-        await handler.call(scope || {}, params);
+        return await handler.call(scope || {}, params);
     }
 
     _reportStats({ method, type, startTs, isError = false }) {
