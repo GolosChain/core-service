@@ -136,8 +136,15 @@ const ServiceMeta = require('../utils/ServiceMeta');
  * Либо можно добавлять их динамически через метод `addService`.
  */
 class Connector extends BasicService {
-    constructor() {
+    /**
+     * @param {string} [host] Адрес подключения, иначе возьмется из GLS_CONNECTOR_HOST.
+     * @param {number} [port] Порт подключения, иначе возьмется из GLS_CONNECTOR_PORT.
+     */
+    constructor({ host = env.GLS_CONNECTOR_HOST, port = env.GLS_CONNECTOR_PORT } = {}) {
         super();
+
+        this._host = host;
+        this._port = port;
 
         this._server = null;
         this._clientsMap = new Map();
@@ -149,10 +156,15 @@ class Connector extends BasicService {
      * Запуск сервиса с конфигурацией.
      * Все параметры являются не обязательными.
      * @param [serverRoutes] Конфигурация роутера, смотри описание класса.
+     * @param [serverDefaults] Конфигурация дефолтов сервера, смотри описание класса.
      * @param [requiredClients] Конфигурация необходимых клиентов, смотри описание класса.
      * @returns {Promise<void>} Промис без экстра данных.
      */
-    async start({ serverRoutes, requiredClients }) {
+    async start({ serverRoutes, serverDefaults, requiredClients }) {
+        if (serverDefaults) {
+            // TODO -
+        }
+
         if (serverRoutes) {
             await this._startServer(serverRoutes);
         }
@@ -278,7 +290,7 @@ class Connector extends BasicService {
 
             this._server = jayson.server(routes).http();
 
-            this._server.listen(env.GLS_CONNECTOR_PORT, env.GLS_CONNECTOR_HOST, error => {
+            this._server.listen(this._port, this._host, error => {
                 if (error) {
                     reject(error);
                 } else {
@@ -358,7 +370,18 @@ class Connector extends BasicService {
             }
         }
 
-        return await handler.call(scope || null, params);
+        const queue = [...(config.before || []), { handler, scope }, ...(config.after || [])];
+        let currentData = params;
+
+        for (const { handler, scope } of queue) {
+            const resultData = await handler.call(scope || null, currentData);
+
+            if (resultData !== undefined) {
+                currentData = resultData;
+            }
+        }
+
+        return currentData;
     }
 
     _reportStats({ method, type, startTs, isError = false }) {
