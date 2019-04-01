@@ -101,7 +101,7 @@ const ServiceMeta = require('../utils/ServiceMeta');
  *     transfer: {
  *         handler: this._handler,  // Обработчик вызова
  *         scope: this,             // Скоуп вызова обработчика
- *         extends: ['auth']         // Имя парент-конфига
+ *         inherit: ['auth']        // Имя парент-конфига
  *     }
  * },
  * serverDefaults: {
@@ -360,7 +360,15 @@ class Connector extends BasicService {
     }
 
     async _handleWithOptions(config, params) {
-        const { handler, scope, validator } = config;
+        const { handler, scope, validator, before = [], after = [], inherit } = config;
+
+        if (inherit) {
+            if (validator) {
+                this._getDefaultValidateInherit();  // TODO -
+            }
+
+            // TODO -
+        }
 
         if (validator) {
             const isValid = validator(params);
@@ -370,7 +378,7 @@ class Connector extends BasicService {
             }
         }
 
-        const queue = [...(config.before || []), { handler, scope }, ...(config.after || [])];
+        const queue = [...before, { handler, scope }, ...after];
         let currentData = params;
 
         for (const { handler, scope } of queue) {
@@ -382,6 +390,15 @@ class Connector extends BasicService {
         }
 
         return currentData;
+    }
+
+    _getDefaultValidateInherit() {
+        return {
+            validation: {
+                type: 'object',
+                additionalProperties: false,
+            },
+        };
     }
 
     _reportStats({ method, type, startTs, isError = false }) {
