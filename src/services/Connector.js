@@ -1,3 +1,4 @@
+const merge = require('deepmerge');
 const Ajv = require('ajv');
 const ajv = new Ajv({ useDefaults: true });
 const jayson = require('jayson');
@@ -101,7 +102,7 @@ const ServiceMeta = require('../utils/ServiceMeta');
  *     transfer: {
  *         handler: this._handler,  // Обработчик вызова
  *         scope: this,             // Скоуп вызова обработчика
- *         inherit: ['auth']        // Имя парент-конфига
+ *         inherits: ['auth']       // Имя парент-конфига
  *     }
  * },
  * serverDefaults: {
@@ -161,12 +162,8 @@ class Connector extends BasicService {
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async start({ serverRoutes, serverDefaults, requiredClients }) {
-        if (serverDefaults) {
-            // TODO -
-        }
-
         if (serverRoutes) {
-            await this._startServer(serverRoutes);
+            await this._startServer(serverRoutes, serverDefaults);
         }
 
         if (requiredClients) {
@@ -284,9 +281,9 @@ class Connector extends BasicService {
         this._useEmptyResponseCorrection = false;
     }
 
-    _startServer(rawRoutes) {
+    _startServer(rawRoutes, serverDefaults) {
         return new Promise((resolve, reject) => {
-            const routes = this._normalizeRoutes(rawRoutes);
+            const routes = this._normalizeRoutes(rawRoutes, serverDefaults);
 
             this._server = jayson.server(routes).http();
 
@@ -306,24 +303,43 @@ class Connector extends BasicService {
         }
     }
 
-    _normalizeRoutes(originalRoutes) {
+    _normalizeRoutes(originalRoutes, serverDefaults) {
         const routes = {};
 
         for (const route of Object.keys(originalRoutes)) {
             const originHandler = originalRoutes[route];
+            const handler = this._tryApplyConfigInherits(originHandler, serverDefaults);
 
-            this._tryApplyValidator(originHandler);
-
-            routes[route] = this._wrapMethod(route, originHandler);
+            routes[route] = this._wrapMethod(route, handler);
         }
 
         return routes;
     }
 
-    _tryApplyValidator(handler) {
-        if (handler && typeof handler !== 'function' && typeof handler.validation === 'object') {
-            handler.validator = ajv.compile(handler.validation);
+    _tryApplyConfigInherits(config, serverDefaults) {
+        if (!config || typeof config === 'function') {
+            return config;
         }
+
+        if (config.validation) {
+            config = merge(this._getDefaultValidationInherits(), config);
+        }
+
+        if (config.inherits) {
+            let inheritedConfig = {};
+
+            for (const alias of config.inherits) {
+                inheritedConfig = merge(inheritedConfig, serverDefaults.parents[alias]);
+            }
+
+            config = merge(inheritedConfig, config);
+        }
+
+        if (config.validation) {
+            config.validator = ajv.compile(config.validation);
+        }
+
+        return config;
     }
 
     _wrapMethod(route, originHandler) {
@@ -360,15 +376,10 @@ class Connector extends BasicService {
     }
 
     async _handleWithOptions(config, params) {
-        const { handler, scope, validator, before = [], after = [], inherit } = config;
+        let { handler, scope, validator, before, after } = config;
 
-        if (inherit) {
-            if (validator) {
-                this._getDefaultValidateInherit();  // TODO -
-            }
-
-            // TODO -
-        }
+        before = before || [];
+        after = after || [];
 
         if (validator) {
             const isValid = validator(params);
@@ -392,7 +403,7 @@ class Connector extends BasicService {
         return currentData;
     }
 
-    _getDefaultValidateInherit() {
+    _getDefaultValidationInherits() {
         return {
             validation: {
                 type: 'object',
