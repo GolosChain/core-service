@@ -322,17 +322,30 @@ class Connector extends BasicService {
         }
 
         if (config.validation) {
-            config = merge(this._getDefaultValidationInherits(), config);
+            config.validation = merge(this._getDefaultValidationInherits(), config.validation);
         }
 
         if (config.inherits) {
             let inheritedConfig = {};
 
             for (const alias of config.inherits) {
-                inheritedConfig = merge(inheritedConfig, serverDefaults.parents[alias]);
+                inheritedConfig.before = merge(
+                    inheritedConfig.before,
+                    serverDefaults.parents[alias].before
+                );
+                inheritedConfig.after = merge(
+                    inheritedConfig.after,
+                    serverDefaults.parents[alias].after
+                );
+                inheritedConfig.validation = merge(
+                    inheritedConfig.validation,
+                    serverDefaults.parents[alias].validation
+                );
             }
 
-            config = merge(inheritedConfig, config);
+            config.before = merge(inheritedConfig.before, config.before);
+            config.after = merge(inheritedConfig.after, config.after);
+            config.validation = merge(inheritedConfig.validation, config.validation);
         }
 
         if (config.validation) {
@@ -405,10 +418,8 @@ class Connector extends BasicService {
 
     _getDefaultValidationInherits() {
         return {
-            validation: {
-                type: 'object',
-                additionalProperties: false,
-            },
+            type: 'object',
+            additionalProperties: false,
         };
     }
 
