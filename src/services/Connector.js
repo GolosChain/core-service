@@ -349,7 +349,7 @@ class Connector extends BasicService {
             config.validation = merge(inherited.validation, config.validation);
         }
 
-        if (Object.keys(config.validation).length > 0) {
+        if (config.validation && Object.keys(config.validation).length > 0) {
             config.validator = ajv.compile(config.validation);
         }
 
