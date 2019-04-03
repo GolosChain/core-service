@@ -336,16 +336,15 @@ class Connector extends BasicService {
             for (const alias of config.inherits) {
                 inherited.before.push(...(parents[alias].before || []));
                 inherited.after.push(...(parents[alias].after || []));
-
                 inherited.validation = merge(inherited.validation, parents[alias].validation || {});
             }
 
             config.before = config.before || [];
             config.after = config.after || [];
+            config.validation = config.validation || {};
 
             config.before.unshift(...inherited.before);
             config.after.unshift(...inherited.after);
-
             config.validation = merge(inherited.validation, config.validation);
         }
 
