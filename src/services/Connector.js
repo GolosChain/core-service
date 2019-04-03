@@ -340,6 +340,9 @@ class Connector extends BasicService {
                 inherited.validation = merge(inherited.validation, parents[alias].validation || {});
             }
 
+            config.before = config.before || [];
+            config.after = config.after || [];
+
             config.before.unshift(...inherited.before);
             config.after.unshift(...inherited.after);
 
