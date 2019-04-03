@@ -326,30 +326,24 @@ class Connector extends BasicService {
         }
 
         if (config.inherits) {
-            let inheritedConfig = {
+            const parents = serverDefaults.parents;
+            const inherited = {
                 before: [],
                 after: [],
                 validation: {},
             };
 
             for (const alias of config.inherits) {
-                inheritedConfig.before = merge(
-                    inheritedConfig.before,
-                    serverDefaults.parents[alias].before || []
-                );
-                inheritedConfig.after = merge(
-                    inheritedConfig.after,
-                    serverDefaults.parents[alias].after || []
-                );
-                inheritedConfig.validation = merge(
-                    inheritedConfig.validation,
-                    serverDefaults.parents[alias].validation || {}
-                );
+                inherited.before.push(...(parents[alias].before || []));
+                inherited.after.push(...(parents[alias].after || []));
+
+                inherited.validation = merge(inherited.validation, parents[alias].validation || {});
             }
 
-            config.before = merge(inheritedConfig.before, config.before);
-            config.after = merge(inheritedConfig.after, config.after);
-            config.validation = merge(inheritedConfig.validation, config.validation);
+            config.before.unshift(...inherited.before);
+            config.after.unshift(...inherited.after);
+
+            config.validation = merge(inherited.validation, config.validation);
         }
 
         if (Object.keys(config.validation).length > 0) {
