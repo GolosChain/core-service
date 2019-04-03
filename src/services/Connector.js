@@ -326,20 +326,24 @@ class Connector extends BasicService {
         }
 
         if (config.inherits) {
-            let inheritedConfig = {};
+            let inheritedConfig = {
+                before: [],
+                after: [],
+                validation: {},
+            };
 
             for (const alias of config.inherits) {
                 inheritedConfig.before = merge(
                     inheritedConfig.before,
-                    serverDefaults.parents[alias].before
+                    serverDefaults.parents[alias].before || []
                 );
                 inheritedConfig.after = merge(
                     inheritedConfig.after,
-                    serverDefaults.parents[alias].after
+                    serverDefaults.parents[alias].after || []
                 );
                 inheritedConfig.validation = merge(
                     inheritedConfig.validation,
-                    serverDefaults.parents[alias].validation
+                    serverDefaults.parents[alias].validation || {}
                 );
             }
 
@@ -348,7 +352,7 @@ class Connector extends BasicService {
             config.validation = merge(inheritedConfig.validation, config.validation);
         }
 
-        if (config.validation) {
+        if (Object.keys(config.validation).length > 0) {
             config.validator = ajv.compile(config.validation);
         }
 
