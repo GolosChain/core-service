@@ -60,7 +60,9 @@ const ServiceMeta = require('../utils/ServiceMeta');
  * если аргумент был объектом и его поля были изменены - изменения
  * будут содержаться и в следующем обработчике. Самый первый обработчик
  * получает оригинал данных от клиента, а данные последнего обработчика
- * будут отправлены клиенту как ответ.
+ * будут отправлены клиенту как ответ. Особое поведение лишь у оригинального
+ * обработчика - в случае отсутствия ответа (значение undefined)
+ * будет передано именно это значение, а не аргументы.
  *
  * ```
  * serverRoutes: {
@@ -389,7 +391,7 @@ class Connector extends BasicService {
     }
 
     async _handleWithOptions(config, params) {
-        let { handler, scope, validator, before, after } = config;
+        let { handler: originalHandler, scope, validator, before, after } = config;
 
         before = before || [];
         after = after || [];
@@ -402,13 +404,13 @@ class Connector extends BasicService {
             }
         }
 
-        const queue = [...before, { handler, scope }, ...after];
+        const queue = [...before, { handler: originalHandler, scope }, ...after];
         let currentData = params;
 
         for (const { handler, scope } of queue) {
             const resultData = await handler.call(scope || null, currentData);
 
-            if (resultData !== undefined) {
+            if (resultData !== undefined || handler === originalHandler) {
                 currentData = resultData;
             }
         }
