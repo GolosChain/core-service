@@ -1,3 +1,4 @@
+const merge = require('deepmerge');
 const Ajv = require('ajv');
 const ajv = new Ajv({ useDefaults: true });
 const jayson = require('jayson');
@@ -17,45 +18,136 @@ const ServiceMeta = require('../utils/ServiceMeta');
  * Лаконичная:
  *
  * ```
- * transfer: (data) => handler(data),
- * history: this._handler.bind(this),
+ * serverRoutes: {
+ *     transfer: (data) => handler(data),
+ *     history: this._handler.bind(this),
+ * }
  * ...
  * ```
  *
- * Полная и с валидацией:
+ * Полная и с ajv валидацией:
  *
  * ```
- * transfer: {
- *     handler: this._handler,  // Обработчик вызова
- *     scope: this,             // Скоуп вызова обработчика
- *     validation: {            // ajv-схема валидации параметров
- *         type: 'object',
- *         additionalProperties: false,
- *         required: ['name'],
- *         properties: {
- *             name: { type: 'string' },
- *             count: { type: 'number' },
+ * serverRoutes: {
+ *     transfer: {
+ *         handler: this._handler,  // Обработчик вызова
+ *         scope: this,             // Скоуп вызова обработчика
+ *         validation: {            // ajv-схема валидации параметров
+ *             required: ['name'],
+ *             properties: {
+ *                 name: { type: 'string' },
+ *                 count: { type: 'number' },
+ *             }
  *         }
  *     }
  * }
  * ...
  * ```
  *
- * В обработчик попадает объект из params JSON-RPC.
+ * Стоит учитывать что валидация сразу устанавливает запрет на отправку дополнительных
+ * полей и предполагает что параметры будут именно объектом, что соответствует
+ * конфигу ajv:
  *
- * Для конфигурации исходящих запросов необходимо передать объект вида:
+ * ```
+ * type: 'object',
+ * additionalProperties: false,
+ * ```
+ *
+ * Также имеется возможность указать пре-обработчики и пост-обработчики.
+ * Пре, пост и оргигинальный обработчик работают по принципу конвеера -
+ * если они что-либо возвращают - оно будет передано далее, в ином случае
+ * далее будет переданы оригинальные аргументы, но передачей по ссылке -
+ * если аргумент был объектом и его поля были изменены - изменения
+ * будут содержаться и в следующем обработчике. Самый первый обработчик
+ * получает оригинал данных от клиента, а данные последнего обработчика
+ * будут отправлены клиенту как ответ. Особое поведение лишь у оригинального
+ * обработчика - в случае отсутствия ответа (значение undefined)
+ * будет передано именно это значение, а не аргументы.
+ *
+ * ```
+ * serverRoutes: {
+ *     transfer: {
+ *         before: [
+ *             {
+ *                 handler: this.checkAuth,
+ *                 scope: this,
+ *             },
+ *             {
+ *                 handler: this.convertIds
+ *                 scope: this,
+ *             },
+ *         ]
+ *         after: [
+ *             {
+ *                 handler: this.transformResult,
+ *                 scope: this,
+ *             },
+ *         ]
+ *         handler: this._handler,  // Обработчик вызова
+ *         scope: this,             // Скоуп вызова обработчика
+ *     }
+ * }
+ * ...
+ * ```
+ *
+ * При необходимости можно вынести повторяющиеся части в дефолтный конфиг
+ * и унаследоваться от него через алиас.
+ * В случае указания одного или нескольких extends сначала будет взят
+ * первый конфиг, сверху добавлены с перезаписью и глубоким мержем
+ * остальные, в конце добавляется оригинал.
+ *
+ * В данном примере мы создаем роут 'transfer' и наследуем валидацию
+ * от конфига 'auth', которая добавляет нам обязательное поле 'secret'.
+ *
+ * ```
+ * serverRoutes: {
+ *     transfer: {
+ *         handler: this._handler,  // Обработчик вызова
+ *         scope: this,             // Скоуп вызова обработчика
+ *         inherits: ['auth']       // Имя парент-конфига
+ *     }
+ * },
+ * serverDefaults: {
+ *     parents: {                         // Пречисление конфигов
+ *         auth: {                        // Имя конфига
+ *             validation: {              // Дефолтные данные валидации.
+ *                 required: ['secret'],
+ *                 properties: {
+ *                     secret: { type: 'string' },
+ *                 }
+ *             }
+ *         }
+ *     }
+ * }
+ * ...
+ * ```
+ *
+ * Для того чтобы использовать метод `callService` необходимо задать алиасы
+ * запросов - алиас является именем, которое указывает на ссылку куда необходимо
+ * отправить запрос. Задать их можно двумя способами.
+ *
+ * Сразу в конфигурации в методе `start`:
  *
  *  ```
- *  alias1: 'http://connect.string1',
- *  alias2: 'http://connect.string2',
+ *  requiredClients: {
+ *      alias1: 'http://connect.string1',
+ *      alias2: 'http://connect.string2',
+ *  }
  *  ...
  *  ```
  *
- * Ключ является алиасом для отправки последующих запросов через метод sendTo.
+ * Либо можно добавлять их динамически через метод `addService`.
  */
 class Connector extends BasicService {
-    constructor() {
+    /**
+     * @param {string} [host] Адрес подключения, иначе возьмется из GLS_CONNECTOR_HOST.
+     * @param {number} [port] Порт подключения, иначе возьмется из GLS_CONNECTOR_PORT.
+     */
+    constructor({ host = env.GLS_CONNECTOR_HOST, port = env.GLS_CONNECTOR_PORT } = {}) {
         super();
+
+        this._host = host;
+        this._port = port;
 
         this._server = null;
         this._clientsMap = new Map();
@@ -67,12 +159,13 @@ class Connector extends BasicService {
      * Запуск сервиса с конфигурацией.
      * Все параметры являются не обязательными.
      * @param [serverRoutes] Конфигурация роутера, смотри описание класса.
+     * @param [serverDefaults] Конфигурация дефолтов сервера, смотри описание класса.
      * @param [requiredClients] Конфигурация необходимых клиентов, смотри описание класса.
      * @returns {Promise<void>} Промис без экстра данных.
      */
-    async start({ serverRoutes, requiredClients }) {
+    async start({ serverRoutes, serverDefaults, requiredClients }) {
         if (serverRoutes) {
-            await this._startServer(serverRoutes);
+            await this._startServer(serverRoutes, serverDefaults);
         }
 
         if (requiredClients) {
@@ -190,13 +283,13 @@ class Connector extends BasicService {
         this._useEmptyResponseCorrection = false;
     }
 
-    _startServer(rawRoutes) {
+    _startServer(rawRoutes, serverDefaults) {
         return new Promise((resolve, reject) => {
-            const routes = this._normalizeRoutes(rawRoutes);
+            const routes = this._normalizeRoutes(rawRoutes, serverDefaults);
 
             this._server = jayson.server(routes).http();
 
-            this._server.listen(env.GLS_CONNECTOR_PORT, env.GLS_CONNECTOR_HOST, error => {
+            this._server.listen(this._port, this._host, error => {
                 if (error) {
                     reject(error);
                 } else {
@@ -212,24 +305,56 @@ class Connector extends BasicService {
         }
     }
 
-    _normalizeRoutes(originalRoutes) {
+    _normalizeRoutes(originalRoutes, serverDefaults) {
         const routes = {};
 
         for (const route of Object.keys(originalRoutes)) {
             const originHandler = originalRoutes[route];
+            const handler = this._tryApplyConfigInherits(originHandler, serverDefaults);
 
-            this._tryApplyValidator(originHandler);
-
-            routes[route] = this._wrapMethod(route, originHandler);
+            routes[route] = this._wrapMethod(route, handler);
         }
 
         return routes;
     }
 
-    _tryApplyValidator(handler) {
-        if (handler && typeof handler !== 'function' && typeof handler.validation === 'object') {
-            handler.validator = ajv.compile(handler.validation);
+    _tryApplyConfigInherits(config, serverDefaults) {
+        if (!config || typeof config === 'function') {
+            return config;
         }
+
+        if (config.validation) {
+            config.validation = merge(this._getDefaultValidationInherits(), config.validation);
+        }
+
+        if (config.inherits) {
+            const parents = serverDefaults.parents;
+            const inherited = {
+                before: [],
+                after: [],
+                validation: {},
+            };
+
+            for (const alias of config.inherits) {
+                inherited.before.push(...(parents[alias].before || []));
+                inherited.after.push(...(parents[alias].after || []));
+                inherited.validation = merge(inherited.validation, parents[alias].validation || {});
+            }
+
+            config.before = config.before || [];
+            config.after = config.after || [];
+            config.validation = config.validation || {};
+
+            config.before.unshift(...inherited.before);
+            config.after.unshift(...inherited.after);
+            config.validation = merge(inherited.validation, config.validation);
+        }
+
+        if (config.validation && Object.keys(config.validation).length > 0) {
+            config.validator = ajv.compile(config.validation);
+        }
+
+        return config;
     }
 
     _wrapMethod(route, originHandler) {
@@ -266,7 +391,10 @@ class Connector extends BasicService {
     }
 
     async _handleWithOptions(config, params) {
-        const { handler, scope, validator } = config;
+        let { handler: originalHandler, scope, validator, before, after } = config;
+
+        before = before || [];
+        after = after || [];
 
         if (validator) {
             const isValid = validator(params);
@@ -276,7 +404,25 @@ class Connector extends BasicService {
             }
         }
 
-        return await handler.call(scope || null, params);
+        const queue = [...before, { handler: originalHandler, scope }, ...after];
+        let currentData = params;
+
+        for (const { handler, scope } of queue) {
+            const resultData = await handler.call(scope || null, currentData);
+
+            if (resultData !== undefined || handler === originalHandler) {
+                currentData = resultData;
+            }
+        }
+
+        return currentData;
+    }
+
+    _getDefaultValidationInherits() {
+        return {
+            type: 'object',
+            additionalProperties: false,
+        };
     }
 
     _reportStats({ method, type, startTs, isError = false }) {
