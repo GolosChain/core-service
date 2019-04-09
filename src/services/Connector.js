@@ -35,8 +35,12 @@ const ServiceMeta = require('../utils/ServiceMeta');
  *         validation: {            // ajv-схема валидации параметров
  *             required: ['name'],
  *             properties: {
- *                 name: { type: 'string' },
- *                 count: { type: 'number' },
+ *                 name: {
+ *                     type: 'string'
+ *                 },
+ *                 count: {
+ *                     type: 'number'
+ *                 },
  *             }
  *         }
  *     }
@@ -113,13 +117,50 @@ const ServiceMeta = require('../utils/ServiceMeta');
  *             validation: {              // Дефолтные данные валидации.
  *                 required: ['secret'],
  *                 properties: {
- *                     secret: { type: 'string' },
+ *                     secret: {
+ *                         type: 'string'
+ *                     },
  *                 }
  *             }
  *         }
  *     }
  * }
  * ...
+ * ```
+ *
+ * Для удобства валидации можно добавить собственные типы валидации
+ * основанные на базовых.
+ *
+ * В данном примере мы добавляем и используем тип, который валидирует
+ * параметр как строку, устанавливает максимальную длинну в 100 символов,
+ * а также разрешаем параметру быть типом null.
+ *
+ * ```
+ * serverRoutes: {
+ *     transfer: {
+ *         handler: this._handler,
+ *         scope: this,
+ *         validation: {
+ *             required: ['message']
+ *             properties: {
+ *                 message: {
+ *                     type: 'message'   // Используем наш нестандартный тип
+ *                 }
+ *             }
+ *         }
+ *     }
+ * },
+ * serverDefaults: {
+ *     validationTypes: {                // Объявляем что у нас есть нестандартные типы
+ *         message: {                    // Указываем имя типа
+ *             type: 'stringOrNull',     // Используем в основе наш тип 'stringOrNull'
+ *             maxLength: 100            // Устанавливаем дополнительную валидацию
+ *         },
+ *         stringOrNull: {               // Указываем имя типа
+ *             type: ['string', 'null']  // Используем встроенные типы 'string' и 'null'
+ *         }
+ *     }
+ * }
  * ```
  *
  * Для того чтобы использовать метод `callService` необходимо задать алиасы
