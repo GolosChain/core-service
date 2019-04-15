@@ -204,7 +204,7 @@ class Connector extends BasicService {
      * @param [requiredClients] Конфигурация необходимых клиентов, смотри описание класса.
      * @returns {Promise<void>} Промис без экстра данных.
      */
-    async start({ serverRoutes, serverDefaults, requiredClients }) {
+    async start({ serverRoutes, serverDefaults = {}, requiredClients }) {
         if (serverRoutes) {
             await this._startServer(serverRoutes, serverDefaults);
         }
@@ -365,37 +365,137 @@ class Connector extends BasicService {
         }
 
         if (config.validation) {
-            config.validation = merge(this._getDefaultValidationInherits(), config.validation);
+            this._applyValidation(config);
         }
 
         if (config.inherits) {
-            const parents = serverDefaults.parents;
-            const inherited = {
-                before: [],
-                after: [],
-                validation: {},
-            };
-
-            for (const alias of config.inherits) {
-                inherited.before.push(...(parents[alias].before || []));
-                inherited.after.push(...(parents[alias].after || []));
-                inherited.validation = merge(inherited.validation, parents[alias].validation || {});
-            }
-
-            config.before = config.before || [];
-            config.after = config.after || [];
-            config.validation = config.validation || {};
-
-            config.before.unshift(...inherited.before);
-            config.after.unshift(...inherited.after);
-            config.validation = merge(inherited.validation, config.validation);
+            this._applyInherits(config, serverDefaults);
         }
 
         if (config.validation && Object.keys(config.validation).length > 0) {
-            config.validator = ajv.compile(config.validation);
+            this._applyCustomValidationTypes(config, serverDefaults);
+            this._compileValidation(config);
         }
 
         return config;
+    }
+
+    _applyValidation(config) {
+        config.validation = merge(this._getDefaultValidationInherits(), config.validation);
+    }
+
+    _applyInherits(config, serverDefaults) {
+        const parents = serverDefaults.parents;
+        const inherited = {
+            before: [],
+            after: [],
+            validation: {},
+        };
+
+        for (const alias of config.inherits) {
+            inherited.before.push(...(parents[alias].before || []));
+            inherited.after.push(...(parents[alias].after || []));
+            inherited.validation = merge(inherited.validation, parents[alias].validation || {});
+        }
+
+        config.before = config.before || [];
+        config.after = config.after || [];
+        config.validation = config.validation || {};
+
+        config.before.unshift(...inherited.before);
+        config.after.unshift(...inherited.after);
+        config.validation = merge(inherited.validation, config.validation);
+    }
+
+    _applyCustomValidationTypes(config, serverDefaults) {
+        if (!serverDefaults.validationTypes) {
+            return;
+        }
+
+        this._resolveCustomInnerTypes(serverDefaults.validationTypes);
+        this._resolveCustomTypesForValidation(config.validation, serverDefaults.validationTypes);
+    }
+
+    _resolveCustomInnerTypes(types) {
+        for (const typeConfig of Object.values(types)) {
+            this._resolveValidationType(typeConfig, types);
+        }
+    }
+
+    _resolveCustomTypesForValidation(validation, types) {
+        if (!validation.properties) {
+            return;
+        }
+
+        for (const typeConfig of Object.values(validation.properties)) {
+            this._resolveValidationType(typeConfig, types);
+            this._resolveCustomTypesForValidation(typeConfig, types);
+        }
+    }
+
+    _resolveValidationType(typeConfig, types) {
+        let typeDefinition = typeConfig.type;
+
+        if (!Array.isArray(typeDefinition)) {
+            typeDefinition = [typeDefinition];
+        }
+
+        this._resolveValidationTypeForDefinition(typeConfig, typeDefinition, types);
+
+        typeDefinition = [...new Set(typeDefinition)];
+
+        if (typeDefinition.length === 1) {
+            typeDefinition = typeDefinition[0];
+        }
+
+        typeConfig.type = typeDefinition;
+    }
+
+    _resolveValidationTypeForDefinition(typeConfig, typeDefinition, types) {
+        for (let i = 0; i < typeDefinition.length; i++) {
+            const customType = types[typeDefinition[i]];
+
+            if (!customType) {
+                continue;
+            }
+
+            typeDefinition[i] = customType.type;
+
+            this._mergeTypeValidationProperties(customType, typeConfig);
+
+            let currentTypes = typeDefinition[i];
+
+            if (!Array.isArray(currentTypes)) {
+                currentTypes = [currentTypes];
+            } else {
+                typeDefinition.splice(i, 1, ...currentTypes);
+            }
+
+            if (currentTypes.some(type => types[type])) {
+                // Resolve again
+                i--;
+            }
+        }
+    }
+
+    _mergeTypeValidationProperties(customType, typeConfig) {
+        for (const key of Object.keys(customType)) {
+            if (key === 'type') {
+                continue;
+            }
+
+            if (!typeConfig[key]) {
+                typeConfig[key] = customType[key];
+            } else if (typeof typeConfig[key] === 'object') {
+                typeConfig[key] = merge(customType[key], typeConfig[key]);
+            } else {
+                // save original value as override
+            }
+        }
+    }
+
+    _compileValidation(config) {
+        config.validator = ajv.compile(config.validation);
     }
 
     _wrapMethod(route, originHandler) {
