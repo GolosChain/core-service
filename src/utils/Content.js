@@ -44,7 +44,11 @@ class Content {
                 'div',
                 'caption',
                 'pre',
+                'img'
             ],
+            allowedAttributes: {
+                img: ['src', 'alt'],
+            },
             transformTags: {
                 h1: 'h2',
             },
