@@ -44,7 +44,7 @@ class Content {
                 'div',
                 'caption',
                 'pre',
-                'img'
+                'img',
             ],
             allowedAttributes: {
                 img: ['src', 'alt'],
@@ -68,6 +68,54 @@ class Content {
         });
 
         return this.smartTrim(sanitized, maxSize);
+    }
+
+    sanitizeMobile(text) {
+        text = text.replace(/\n/, '<br>');
+
+        return sanitizer(text, {
+            allowedTags: [
+                'h1',
+                'h2',
+                'h3',
+                'h4',
+                'h5',
+                'h6',
+                'blockquote',
+                'p',
+                'a',
+                'ul',
+                'ol',
+                'nl',
+                'li',
+                'b',
+                'i',
+                'strong',
+                'em',
+                'strike',
+                'code',
+                'br',
+                'img',
+            ],
+            allowedAttributes: {
+                img: ['src', 'alt'],
+                a: ['href'],
+            },
+            transformTags: {
+                h1: 'h2',
+                nl: 'li',
+            },
+            nonTextTags: ['caption'],
+            exclusiveFilter: function(frame) {
+                if (frame.tag === 'a') {
+                    const href = frame.attribs.href;
+
+                    return !href || href[0] === '#';
+                }
+
+                return false;
+            },
+        });
     }
 
     /**
@@ -153,3 +201,9 @@ class Content {
 }
 
 module.exports = Content;
+
+console.log(
+    new Content().sanitizeMobile(
+        'a\nb'
+    )
+);
