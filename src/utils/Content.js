@@ -201,9 +201,3 @@ class Content {
 }
 
 module.exports = Content;
-
-console.log(
-    new Content().sanitizeMobile(
-        'a\nb'
-    )
-);
