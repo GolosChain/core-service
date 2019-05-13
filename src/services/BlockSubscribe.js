@@ -10,6 +10,8 @@ const Logger = require('../utils/Logger');
  * Подписывается на рассылку блоков от CyberWay-ноды.
  * Каждый полученный блок сериализуется и передается
  * в эвенте 'block', а в случае форка вызывается эвент 'fork'.
+ * Для работы с генезис-блоком предоставлен специальный
+ * эвент 'genesisData'.
  *
  * Текущая версия не поддерживает 'fork'!
  */
@@ -46,6 +48,13 @@ class BlockSubscribe extends BasicService {
      * @property {number} block.blockNum Номер блока.
      * @property {Date} block.blockTime Время блока.
      * @property {Array<Object>} block.transactions Транзакции в оригинальном виде.
+     */
+
+    /**
+     * Вызывается в случае получения данных из генезис-блока.
+     * @event genesisData
+     * @property {String} type Тип генезис-данных.
+     * @property {Object} data Генезис-данные.
      */
 
     /**
@@ -91,6 +100,7 @@ class BlockSubscribe extends BasicService {
             this._makeMessageHandler('ApplyTrx', this._handleTransactionApply.bind(this));
             this._makeMessageHandler('AcceptBlock', this._handleBlockAccept.bind(this));
             this._makeMessageHandler('CommitBlock', this._handleBlockCommit.bind(this));
+            this._makeMessageHandler('GenesisData', this._handleGenesisData.bind(this));
         });
         this._connection.on('close', () => {
             Logger.error('Blockchain block broadcaster connection failed');
@@ -247,6 +257,10 @@ class BlockSubscribe extends BasicService {
             }
             await sleep(0);
         }
+    }
+
+    _handleGenesisData({ name: type, data }) {
+        this.emit('genesisData', type, data);
     }
 }
 
