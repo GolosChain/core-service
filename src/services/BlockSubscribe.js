@@ -22,12 +22,31 @@ class BlockSubscribe extends BasicService {
      * Более ранние блоки будут проигнорированны.
      * В случае если очередь блокчейн-ноды уже не хранит необходимые
      * старые блоки - блоки могут быть пропущены (в текущей версии).
-     * @param {boolean} onlyIrreversible
+     * @param {boolean} [onlyIrreversible]
      * В случае true эвенты будут возвращать только неоткатные блоки,
      * игнорируя те блоки что блокчейн ещё не пометил неоткатными.
+     * @param {string} [serverName]
+     * Имя сервера для подписки, в ином случае берется из env.
+     * @param {string} [clientName]
+     * Имя клиента, предоставляемое серверу, в ином случае берется из env.
+     * @param {string} [connectString]
+     * Строка подключения (с авторизацией), в ином случае берется из env.
      */
-    constructor(startFromBlock = 0, { onlyIrreversible = false } = {}) {
+    constructor(
+        startFromBlock = 0,
+        {
+            onlyIrreversible = false,
+            serverName = env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
+            clientName = env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
+            connectString = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
+        } = {}
+    ) {
         super();
+
+        this._onlyIrreversible = onlyIrreversible;
+        this._serverName = serverName;
+        this._clientName = clientName;
+        this._connectString = connectString;
 
         this._startFromBlock = startFromBlock;
         this._blockQueue = [];
@@ -37,7 +56,6 @@ class BlockSubscribe extends BasicService {
         this._connection = null;
         this._currentBlockNum = Infinity;
         this._isFirstBlock = true;
-        this._onlyIrreversible = onlyIrreversible;
     }
 
     /**
@@ -87,11 +105,59 @@ class BlockSubscribe extends BasicService {
         });
     }
 
+    /**
+     * Вызовет переданную функцию на каждый блок, полученный
+     * из блокчейна, при этом дождавшись её выполнения
+     * используя await.
+     * Аргументы для функции аналогичны эвенту block.
+     * @param {function} callback Обработчик.
+     */
+    eachBlock(callback) {
+        const queue = [];
+
+        this.on('block', data => queue.push([data]));
+
+        this._eachDataIterator(queue, callback).catch(error => {
+            Logger.error(`BlockSubscribe block iterator error - ${error}`);
+            process.exit(1);
+        });
+    }
+
+    /**
+     * Вызовет переданную функцию на каждый набор данных
+     * генезиса, при этом дождавшись выполнения этой функции
+     * используя await.
+     * Аргументы для функции аналогичны эвенту genesisData.
+     * @param {function} callback Обработчик.
+     */
+    eachGenesisData(callback) {
+        const queue = [];
+
+        this.on('genesisData', (type, data) => queue.push([type, data]));
+
+        this._eachDataIterator(queue, callback).catch(error => {
+            Logger.error(`BlockSubscribe genesis iterator error - ${error}`);
+            process.exit(1);
+        });
+    }
+
+    async _eachDataIterator(queue, callback) {
+        while (true) {
+            const data = queue.shift();
+
+            if (data) {
+                await callback(...data);
+            }
+
+            await sleep(0);
+        }
+    }
+
     _connectToMessageBroker() {
         this._connection = nats.connect(
-            env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
-            env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
-            env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT
+            this._serverName,
+            this._clientName,
+            this._connectString
         );
     }
 
