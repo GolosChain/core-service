@@ -3,7 +3,7 @@ const nats = require('node-nats-streaming');
 const BasicService = require('./Basic');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
-const parallelProtection = require('../utils/parallelProtection');
+const { parallelProtection } = require('../utils/parallel');
 
 // TODO Fork management
 /**
