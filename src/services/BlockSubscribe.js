@@ -3,6 +3,7 @@ const nats = require('node-nats-streaming');
 const BasicService = require('./Basic');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
+const parallelProtection = require('../utils/parallelProtection');
 
 // TODO Fork management
 /**
@@ -56,6 +57,8 @@ class BlockSubscribe extends BasicService {
         this._connection = null;
         this._currentBlockNum = Infinity;
         this._isFirstBlock = true;
+
+        this._notifyByItemProtected = parallelProtection(this._notifyByItem.bind(this));
     }
 
     /**
@@ -99,10 +102,6 @@ class BlockSubscribe extends BasicService {
         this._connectToMessageBroker();
         this._makeBlockHandlers();
         this._makeCleaners();
-        this._startNotifier().catch(error => {
-            Logger.error(`Block notifier error - ${error.stack}`);
-            process.exit(1);
-        });
     }
 
     /**
@@ -113,14 +112,7 @@ class BlockSubscribe extends BasicService {
      * @param {function} callback Обработчик.
      */
     eachBlock(callback) {
-        const queue = [];
-
-        this.on('block', data => queue.push([data]));
-
-        this._eachDataIterator(queue, callback).catch(error => {
-            Logger.error(`BlockSubscribe block iterator error - ${error}`);
-            process.exit(1);
-        });
+        this.on('block', parallelProtection(callback));
     }
 
     /**
@@ -131,26 +123,7 @@ class BlockSubscribe extends BasicService {
      * @param {function} callback Обработчик.
      */
     eachGenesisData(callback) {
-        const queue = [];
-
-        this.on('genesisData', (type, data) => queue.push([type, data]));
-
-        this._eachDataIterator(queue, callback).catch(error => {
-            Logger.error(`BlockSubscribe genesis iterator error - ${error}`);
-            process.exit(1);
-        });
-    }
-
-    async _eachDataIterator(queue, callback) {
-        while (true) {
-            const data = queue.shift();
-
-            if (data) {
-                await callback(...data);
-            }
-
-            await sleep(0);
-        }
+        this.on('genesisData', parallelProtection(callback));
     }
 
     _connectToMessageBroker() {
@@ -225,6 +198,7 @@ class BlockSubscribe extends BasicService {
         while ((block = this._reversibleBlockBuffer.shift())) {
             if (block.blockNum <= irreversibleNum) {
                 this._blockQueue.push(block);
+                this._notifyByItemProtected(block);
             } else {
                 this._reversibleBlockBuffer.unshift(block);
                 break;
@@ -277,21 +251,6 @@ class BlockSubscribe extends BasicService {
         } catch (error) {
             Logger.error(`Invalid blockchain message - ${error.stack}`);
             process.exit(1);
-        }
-    }
-
-    async _startNotifier() {
-        while (true) {
-            await this._notifyByQueue();
-            await sleep(0);
-        }
-    }
-
-    async _notifyByQueue() {
-        let item;
-
-        while ((item = this._blockQueue.shift())) {
-            await this._notifyByItem(item);
         }
     }
 
