@@ -3,7 +3,7 @@ const nats = require('node-nats-streaming');
 const BasicService = require('./Basic');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
-const { parallelProtection } = require('../utils/parallel');
+const ParallelUtils = require('../utils/ParallelUtils');
 
 // TODO Fork management
 /**
@@ -58,7 +58,9 @@ class BlockSubscribe extends BasicService {
         this._currentBlockNum = Infinity;
         this._isFirstBlock = true;
 
-        this._notifyByItemProtected = parallelProtection(this._notifyByItem.bind(this));
+        this._parallelUtils = new ParallelUtils();
+
+        this._notifyByItemProtected = this._parallelUtils.protect(this._notifyByItem.bind(this));
     }
 
     /**
@@ -112,7 +114,7 @@ class BlockSubscribe extends BasicService {
      * @param {function} callback Обработчик.
      */
     eachBlock(callback) {
-        this.on('block', parallelProtection(callback));
+        this.on('block', this._parallelUtils.protect(callback));
     }
 
     /**
@@ -123,7 +125,7 @@ class BlockSubscribe extends BasicService {
      * @param {function} callback Обработчик.
      */
     eachGenesisData(callback) {
-        this.on('genesisData', parallelProtection(callback));
+        this.on('genesisData', this._parallelUtils.protect(callback));
     }
 
     _connectToMessageBroker() {
