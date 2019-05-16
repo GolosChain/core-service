@@ -50,7 +50,6 @@ class BlockSubscribe extends BasicService {
         this._connectString = connectString;
 
         this._startFromBlock = startFromBlock;
-        this._blockQueue = [];
         this._reversibleBlockBuffer = [];
         this._pendingTransactionsBuffer = new Map();
         this._handledBlocksBuffer = new Map();
@@ -59,8 +58,6 @@ class BlockSubscribe extends BasicService {
         this._isFirstBlock = true;
 
         this._parallelUtils = new ParallelUtils();
-
-        this._notifyByItemProtected = this._parallelUtils.consequentially(this._notifyByItem.bind(this));
     }
 
     /**
@@ -199,8 +196,7 @@ class BlockSubscribe extends BasicService {
 
         while ((block = this._reversibleBlockBuffer.shift())) {
             if (block.blockNum <= irreversibleNum) {
-                this._blockQueue.push(block);
-                this._notifyByItemProtected(block);
+                this._notifyByItem(block);
             } else {
                 this._reversibleBlockBuffer.unshift(block);
                 break;
@@ -220,20 +216,18 @@ class BlockSubscribe extends BasicService {
     }
 
     _insertInQueue(rawBlock, transactions) {
-        let queue;
-
-        if (this._onlyIrreversible) {
-            queue = this._reversibleBlockBuffer;
-        } else {
-            queue = this._blockQueue;
-        }
-
-        queue.push({
+        const block = {
             id: rawBlock.id,
             blockNum: rawBlock.block_num,
             blockTime: new Date(rawBlock.block_time),
             transactions,
-        });
+        };
+
+        if (this._onlyIrreversible) {
+            this._reversibleBlockBuffer.push(block);
+        } else {
+            this._notifyByItem(block);
+        }
     }
 
     _makeMessageHandler(type, callback) {
@@ -256,7 +250,7 @@ class BlockSubscribe extends BasicService {
         }
     }
 
-    async _notifyByItem(block) {
+    _notifyByItem(block) {
         if (block.blockNum >= this._startFromBlock) {
             this.emit('block', block);
         } else {
