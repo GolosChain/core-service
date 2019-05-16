@@ -16,6 +16,7 @@ const UtilsServiceMeta = require('./src/utils/ServiceMeta');
 const UtilsContent = require('./src/utils/Content');
 const utilsDefaultStarter = require('./src/utils/defaultStarter');
 const UtilsGateClient = require('./src/utils/GateClient');
+const UtilsParallel = require('./src/utils/Parallel');
 
 const TypesBigNum = require('./src/types/BigNum');
 const TypesMongoBigNum = require('./src/types/MongoBigNum');
@@ -41,6 +42,7 @@ module.exports = {
         RpcObject: UtilsRpcObject,
         statsClient: utilsStatsClient,
         ServiceMeta: UtilsServiceMeta,
+        Parallel: UtilsParallel,
         Content: UtilsContent,
         defaultStarter: utilsDefaultStarter,
         GateClient: UtilsGateClient,

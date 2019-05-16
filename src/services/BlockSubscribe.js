@@ -3,6 +3,7 @@ const nats = require('node-nats-streaming');
 const BasicService = require('./Basic');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
+const ParallelUtils = require('../utils/Parallel');
 
 // TODO Fork management
 /**
@@ -10,6 +11,8 @@ const Logger = require('../utils/Logger');
  * Подписывается на рассылку блоков от CyberWay-ноды.
  * Каждый полученный блок сериализуется и передается
  * в эвенте 'block', а в случае форка вызывается эвент 'fork'.
+ * Для работы с генезис-блоком предоставлен специальный
+ * эвент 'genesisData'.
  *
  * Текущая версия не поддерживает 'fork'!
  */
@@ -20,12 +23,31 @@ class BlockSubscribe extends BasicService {
      * Более ранние блоки будут проигнорированны.
      * В случае если очередь блокчейн-ноды уже не хранит необходимые
      * старые блоки - блоки могут быть пропущены (в текущей версии).
-     * @param {boolean} onlyIrreversible
+     * @param {boolean} [onlyIrreversible]
      * В случае true эвенты будут возвращать только неоткатные блоки,
      * игнорируя те блоки что блокчейн ещё не пометил неоткатными.
+     * @param {string} [serverName]
+     * Имя сервера для подписки, в ином случае берется из env.
+     * @param {string} [clientName]
+     * Имя клиента, предоставляемое серверу, в ином случае берется из env.
+     * @param {string} [connectString]
+     * Строка подключения (с авторизацией), в ином случае берется из env.
      */
-    constructor(startFromBlock = 0, { onlyIrreversible = false } = {}) {
+    constructor(
+        startFromBlock = 0,
+        {
+            onlyIrreversible = false,
+            serverName = env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
+            clientName = env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
+            connectString = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
+        } = {}
+    ) {
         super();
+
+        this._onlyIrreversible = onlyIrreversible;
+        this._serverName = serverName;
+        this._clientName = clientName;
+        this._connectString = connectString;
 
         this._startFromBlock = startFromBlock;
         this._blockQueue = [];
@@ -35,7 +57,10 @@ class BlockSubscribe extends BasicService {
         this._connection = null;
         this._currentBlockNum = Infinity;
         this._isFirstBlock = true;
-        this._onlyIrreversible = onlyIrreversible;
+
+        this._parallelUtils = new ParallelUtils();
+
+        this._notifyByItemProtected = this._parallelUtils.consequentially(this._notifyByItem.bind(this));
     }
 
     /**
@@ -46,6 +71,13 @@ class BlockSubscribe extends BasicService {
      * @property {number} block.blockNum Номер блока.
      * @property {Date} block.blockTime Время блока.
      * @property {Array<Object>} block.transactions Транзакции в оригинальном виде.
+     */
+
+    /**
+     * Вызывается в случае получения данных из генезис-блока.
+     * @event genesisData
+     * @property {String} type Тип генезис-данных.
+     * @property {Object} data Генезис-данные.
      */
 
     /**
@@ -72,17 +104,35 @@ class BlockSubscribe extends BasicService {
         this._connectToMessageBroker();
         this._makeBlockHandlers();
         this._makeCleaners();
-        this._startNotifier().catch(error => {
-            Logger.error(`Block notifier error - ${error.stack}`);
-            process.exit(1);
-        });
+    }
+
+    /**
+     * Вызовет переданную функцию на каждый блок, полученный
+     * из блокчейна, при этом дождавшись её выполнения
+     * используя await.
+     * Аргументы для функции аналогичны эвенту block.
+     * @param {function} callback Обработчик.
+     */
+    eachBlock(callback) {
+        this.on('block', this._parallelUtils.consequentially(callback));
+    }
+
+    /**
+     * Вызовет переданную функцию на каждый набор данных
+     * генезиса, при этом дождавшись выполнения этой функции
+     * используя await.
+     * Аргументы для функции аналогичны эвенту genesisData.
+     * @param {function} callback Обработчик.
+     */
+    eachGenesisData(callback) {
+        this.on('genesisData', this._parallelUtils.consequentially(callback));
     }
 
     _connectToMessageBroker() {
         this._connection = nats.connect(
-            env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
-            env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
-            env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT
+            this._serverName,
+            this._clientName,
+            this._connectString
         );
     }
 
@@ -91,6 +141,7 @@ class BlockSubscribe extends BasicService {
             this._makeMessageHandler('ApplyTrx', this._handleTransactionApply.bind(this));
             this._makeMessageHandler('AcceptBlock', this._handleBlockAccept.bind(this));
             this._makeMessageHandler('CommitBlock', this._handleBlockCommit.bind(this));
+            this._makeMessageHandler('GenesisData', this._handleGenesisData.bind(this));
         });
         this._connection.on('close', () => {
             Logger.error('Blockchain block broadcaster connection failed');
@@ -149,6 +200,7 @@ class BlockSubscribe extends BasicService {
         while ((block = this._reversibleBlockBuffer.shift())) {
             if (block.blockNum <= irreversibleNum) {
                 this._blockQueue.push(block);
+                this._notifyByItemProtected(block);
             } else {
                 this._reversibleBlockBuffer.unshift(block);
                 break;
@@ -204,21 +256,6 @@ class BlockSubscribe extends BasicService {
         }
     }
 
-    async _startNotifier() {
-        while (true) {
-            await this._notifyByQueue();
-            await sleep(0);
-        }
-    }
-
-    async _notifyByQueue() {
-        let item;
-
-        while ((item = this._blockQueue.shift())) {
-            await this._notifyByItem(item);
-        }
-    }
-
     async _notifyByItem(block) {
         if (block.blockNum >= this._startFromBlock) {
             this.emit('block', block);
@@ -247,6 +284,10 @@ class BlockSubscribe extends BasicService {
             }
             await sleep(0);
         }
+    }
+
+    _handleGenesisData({ name: type, data }) {
+        this.emit('genesisData', type, data);
     }
 }
 
