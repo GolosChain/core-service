@@ -1,6 +1,6 @@
 {
   "name": "gls-core-service",
-  "version": "3.25.0",
+  "version": "3.25.1",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -22,7 +22,7 @@
     "jayson": "^2.1.2",
     "lodash.template": "^4.4.0",
     "moment": "^2.24.0",
-    "mongoose": "^5.5.8",
+    "mongoose": "^5.5.9",
     "node-nats-streaming": "0.0.51",
     "node-statsd": "^0.1.1",
     "random": "^2.1.1",
