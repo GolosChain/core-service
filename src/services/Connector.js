@@ -423,13 +423,15 @@ class Connector extends BasicService {
     }
 
     _resolveCustomTypesForValidation(validation, types) {
-        if (!validation.properties) {
-            return;
-        }
+        for (const propertyName of Object.keys(validation)) {
+            if (['properties', 'oneOf'].includes(propertyName)) {
+                const validationInner = validation[propertyName];
 
-        for (const typeConfig of Object.values(validation.properties)) {
-            this._resolveValidationType(typeConfig, types);
-            this._resolveCustomTypesForValidation(typeConfig, types);
+                for (const typeConfig of Object.values(validationInner)) {
+                    this._resolveValidationType(typeConfig, types);
+                    this._resolveCustomTypesForValidation(typeConfig, types);
+                }
+            }
         }
     }
 
