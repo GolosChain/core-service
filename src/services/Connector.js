@@ -129,7 +129,8 @@ const ServiceMeta = require('../utils/ServiceMeta');
  * ```
  *
  * Для удобства валидации можно добавить собственные типы валидации
- * основанные на базовых.
+ * основанные на базовых. Типы поддерживаются внутри конфигурации
+ * properties, а также внутри oneOf, anyOf и allOf.
  *
  * В данном примере мы добавляем и используем тип, который валидирует
  * параметр как строку, устанавливает максимальную длинну в 100 символов,
@@ -423,7 +424,7 @@ class Connector extends BasicService {
     }
 
     _resolveCustomTypesForValidation(validation, types) {
-        for (const propertyName of ['properties', 'oneOf']) {
+        for (const propertyName of ['properties', 'oneOf', 'allOf', 'anyOf']) {
             const validationInner = validation[propertyName];
 
             if (validationInner) {
