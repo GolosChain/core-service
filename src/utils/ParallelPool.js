@@ -45,6 +45,12 @@ class ParallelPool {
         return itemInfo.promise;
     }
 
+    /**
+     * Добавить в очередь выполнения вызовы для обработчика,
+     * возвращает массив результирующих значений обернутые в Promise.
+     * @param {Array} list
+     * @returns {Promise<[]>}
+     */
     queueList(list) {
         return Promise.all(list.map(arg => this.queue(arg)));
     }
