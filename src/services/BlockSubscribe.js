@@ -4,6 +4,7 @@ const BasicService = require('./Basic');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const ParallelUtils = require('../utils/Parallel');
+const stats = require('../utils/Stats').global();
 
 // TODO Fork management
 /**
@@ -56,6 +57,8 @@ class BlockSubscribe extends BasicService {
         this._connection = null;
         this._currentBlockNum = Infinity;
         this._isFirstBlock = true;
+        this._isGenesisStarted = false;
+        this._isGenesisBeginningFailed = false;
 
         this._parallelUtils = new ParallelUtils();
     }
@@ -147,6 +150,8 @@ class BlockSubscribe extends BasicService {
     }
 
     async _handleTransactionApply(transaction) {
+        stats.inc('core:block.apply');
+
         try {
             transaction.actions = transaction.actions.filter(action => action.data === '');
 
@@ -158,6 +163,8 @@ class BlockSubscribe extends BasicService {
     }
 
     async _handleBlockAccept(rawBlock) {
+        stats.inc('core:block.accept');
+
         if (!rawBlock.validated || this._handledBlocksBuffer.has(rawBlock.id)) {
             return;
         }
@@ -186,6 +193,8 @@ class BlockSubscribe extends BasicService {
 
     // do not make this method async, synchronous algorithm
     _handleBlockCommit({ block_num: irreversibleNum }) {
+        stats.inc('core:block.commit');
+
         this.emit('irreversibleBlockNum', irreversibleNum);
 
         if (!this._onlyIrreversible) {
@@ -253,7 +262,9 @@ class BlockSubscribe extends BasicService {
     _notifyByItem(block) {
         if (block.blockNum >= this._startFromBlock) {
             this.emit('block', block);
+            stats.inc('core:block.received');
         } else {
+            stats.inc('core:block.received-outdated');
             Logger.log(`Skip outdated block ${block.blockNum}`);
         }
     }
@@ -281,6 +292,24 @@ class BlockSubscribe extends BasicService {
     }
 
     _handleGenesisData({ name: type, data }) {
+        if (this._isGenesisBeginningFailed) {
+            return;
+        }
+
+        stats.inc('core:genesis.block.received');
+        stats.inc(`core:genesis.block.received.${type}`);
+
+        if (type === 'datastart') {
+            this._isGenesisStarted = true;
+            return;
+        }
+
+        if (!this._isGenesisStarted) {
+            this._isGenesisBeginningFailed = true;
+            Logger.error('Genesis beginning are missed, need restart blockchain node!');
+            return;
+        }
+
         this.emit('genesisData', type, data);
     }
 }
