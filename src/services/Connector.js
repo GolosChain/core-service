@@ -5,7 +5,7 @@ const jayson = require('jayson');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const BasicService = require('./Basic');
-const stats = require('../utils/statsClient');
+const metrics = require('../utils/metrics');
 const ServiceMeta = require('../utils/ServiceMeta');
 
 /**
@@ -583,10 +583,10 @@ class Connector extends BasicService {
         const general = `${serviceName}:${type}_api_${status}`;
         const details = `${serviceName}:${type}_${method}_${status}`;
 
-        stats.increment(`${general}_count`);
-        stats.timing(`${general}_time`, time);
-        stats.increment(`${details}_count`);
-        stats.timing(`${details}_time`, time);
+        metrics.inc(`${general}_count`);
+        metrics.recordTime(`${general}_time`, time);
+        metrics.inc(`${details}_count`);
+        metrics.recordTime(`${details}_time`, time);
     }
 
     _handleHandlerError(callback, error) {

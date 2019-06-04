@@ -2,6 +2,7 @@ const Basic = require('./Basic');
 const ServiceMeta = require('../utils/ServiceMeta');
 const MongoDB = require('../services/MongoDB');
 const Logger = require('../utils/Logger');
+const metrics = require('../utils/metrics');
 
 /**
  * Базовый класс главного класса приложения.
@@ -20,14 +21,13 @@ const Logger = require('../utils/Logger');
  * перед запуском вложенных сервисаов.
  */
 class BasicMain extends Basic {
-    constructor(stats, env = null) {
+    constructor(env = null) {
         super();
 
         if (env) {
             this.printEnvBasedConfig(env);
         }
 
-        this._stats = stats;
         this.stopOnExit();
         this.throwOnUnhandledPromiseRejection();
 
@@ -40,13 +40,13 @@ class BasicMain extends Basic {
         await this.startNested();
         this._tryIncludeMongoToNested();
 
-        this._stats.increment(`${ServiceMeta.get('name')}:main_service_start`);
+        metrics.inc(`${ServiceMeta.get('name')}:main_service_start`);
     }
 
     async stop() {
         await this.stopNested();
 
-        this._stats.increment(`${ServiceMeta.get('name')}:main_service_stop`);
+        metrics.inc(`${ServiceMeta.get('name')}:main_service_stop`);
         process.exit(0);
     }
 
