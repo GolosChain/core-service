@@ -40,13 +40,13 @@ class BasicMain extends Basic {
         await this.startNested();
         this._tryIncludeMongoToNested();
 
-        metrics.inc(`${ServiceMeta.get('name')}:main_service_start`);
+        metrics.inc('service_start');
     }
 
     async stop() {
         await this.stopNested();
 
-        metrics.inc(`${ServiceMeta.get('name')}:main_service_stop`);
+        metrics.inc('service_stop');
         process.exit(0);
     }
 

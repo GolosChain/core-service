@@ -1,5 +1,6 @@
 require('colors');
 const moment = require('moment');
+const metrics = require('./metrics');
 
 /**
  * Логгер действий.
@@ -25,6 +26,7 @@ class Logger {
      */
     static warn(...args) {
         this._log('[warn]', args, 'yellow');
+        metrics.inc('log_warnings');
     }
 
     /**
@@ -32,6 +34,7 @@ class Logger {
      */
     static error(...args) {
         this._log('[error]', args, 'red');
+        metrics.inc('log_errors');
     }
 
     static _log(prefix, data, color) {
