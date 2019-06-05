@@ -16,7 +16,7 @@ const UtilsContent = require('./src/utils/Content');
 const utilsDefaultStarter = require('./src/utils/defaultStarter');
 const UtilsGateClient = require('./src/utils/GateClient');
 const UtilsParallel = require('./src/utils/Parallel');
-const utilMetrics = require('./src/utils/metrics');
+const utilsMetrics = require('./src/utils/metrics');
 
 const TypesBigNum = require('./src/types/BigNum');
 const TypesMongoBigNum = require('./src/types/MongoBigNum');
@@ -45,7 +45,7 @@ module.exports = {
         Content: UtilsContent,
         defaultStarter: utilsDefaultStarter,
         GateClient: UtilsGateClient,
-        metrics: utilMetrics,
+        metrics: utilsMetrics,
     },
     types: {
         BigNum: TypesBigNum,
