@@ -3,14 +3,6 @@ const client = require('prom-client');
 const env = require('../data/env');
 
 class PrometheusMetrics {
-    static get() {
-        if (!PrometheusMetrics._instance) {
-            PrometheusMetrics._instance = new PrometheusMetrics();
-        }
-
-        return PrometheusMetrics._instance;
-    }
-
     constructor() {
         if (env.GLS_SYSTEM_METRICS) {
             client.collectDefaultMetrics({ timeout: 5000 });

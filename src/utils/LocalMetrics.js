@@ -2,21 +2,6 @@ const fs = require('fs');
 const Logger = require('./Logger');
 
 class LocalMetrics {
-    /**
-     *
-     * @param {'log'|'file'} [type='log']
-     * @returns {LocalMetrics}
-     */
-    static get(type = 'log') {
-        if (!LocalMetrics._global) {
-            LocalMetrics._global = new LocalMetrics({
-                type,
-            });
-        }
-
-        return LocalMetrics._global;
-    }
-
     constructor({ type = 'log', interval = null } = {}) {
         this._values = new Map();
         this._previous = {};
