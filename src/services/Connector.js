@@ -579,9 +579,8 @@ class Connector extends BasicService {
             status = 'success';
         }
 
-        const serviceName = ServiceMeta.get('name');
-        const general = `${serviceName}:${type}_api_${status}`;
-        const details = `${serviceName}:${type}_${method}_${status}`;
+        const general = `${type}_api_${status}`;
+        const details = `${type}_${method}_${status}`;
 
         metrics.inc(`${general}_count`);
         metrics.recordTime(`${general}_time`, time);
