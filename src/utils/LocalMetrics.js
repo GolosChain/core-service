@@ -24,54 +24,79 @@ class LocalMetrics {
         }
     }
 
-    inc(name) {
-        const value = this._values.get(name) || 0;
-        this._values.set(name, value + 1);
+    /**
+     * Увеличить счетчик.
+     * @param {string} metricName
+     * @param {number} [count=1]
+     */
+    inc(metricName, count = 1) {
+        const value = this._values.get(metricName) || 0;
+        this._values.set(metricName, value + count);
     }
 
-    set(name, value) {
-        this._values(name, value);
+    /**
+     * Установить значение метрики.
+     * (в графиках будет отображено всегда последнее выставленное значение без агрегации)
+     * @param {string} metricName
+     * @param {number} value
+     */
+    set(metricName, value) {
+        this._values(metricName, value);
     }
 
-    recordTime() {
-        // Добавить в будущем
+    /**
+     * Записать время.
+     * @param {string} metricName
+     * @param {number} time
+     */
+    recordTime(metricName, time) {
+        // Время запросов нужно обрабатывать с помощью персентилей и агригационной функции,
+        // для локальной разработки это не нужно
     }
 
-    startTimer() {
-        // Добавить в будущем
+    /**
+     * Начать замер времени, возвращает функцию которую надо вызвать в конце замера.
+     * @param {string} metricName
+     * @returns {Function}
+     */
+    startTimer(metricName) {
+        // По аналогии с recordTime
+        return () => {};
     }
 
     _prepare(type) {
         const keys = [...this._values.keys()].sort();
         const current = new Map();
 
-        const lines = keys.map(key => {
-            const value = this._values.get(key);
-            let prev = null;
-            let diff = '';
-
-            current.set(key, value);
-
-            if (this._previous[type]) {
-                prev = this._previous[type].get(key);
-            }
-
-            if (value !== prev) {
-                if (typeof value === 'number' && typeof prev === 'number') {
-                    diff = value - (prev || 0);
-                } else {
-                    diff = prev;
-                }
-
-                diff = ` (${diff > 0 ? '+' : ''}${diff})`;
-            }
-
-            return `${key}: ${value}${diff}`;
-        });
+        const lines = keys.map(key => this._formatLine(type, current, key));
 
         this._previous[type] = current;
 
         return lines;
+    }
+
+    _formatLine(type, current, key) {
+        const value = this._values.get(key);
+        let prev = null;
+        let diff = '';
+
+        current.set(key, value);
+
+        if (this._previous[type]) {
+            prev = this._previous[type].get(key);
+        }
+
+        if (value !== prev) {
+            if (typeof value === 'number' && typeof prev === 'number') {
+                diff = value - (prev || 0);
+            } else {
+                diff = prev;
+            }
+
+            diff = ` (${diff > 0 ? '+' : ''}${diff})`;
+        }
+
+        return `${key}: ${value}${diff}`;
     }
 
     _print() {
