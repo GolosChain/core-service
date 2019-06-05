@@ -95,17 +95,18 @@ class PrometheusMetrics {
     }
 
     _getHistogram(metricName) {
-        let gouge = this._histograms.get(metricName);
+        let histogram = this._histograms.get(metricName);
 
-        if (!gouge) {
-            gouge = new client.Histogram({
+        if (!histogram) {
+            histogram = new client.Histogram({
                 name: metricName,
                 help: 'no help',
                 buckets: [0.2, 0.5, 1, 2, 4],
             });
+            this._histograms.set(metricName, histogram);
         }
 
-        return gouge;
+        return histogram;
     }
 }
 
