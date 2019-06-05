@@ -11,12 +11,12 @@ const UtilsLogger = require('./src/utils/Logger');
 const UtilsMoments = require('./src/utils/Moments');
 const UtilsTemplate = require('./src/utils/Template');
 const UtilsRpcObject = require('./src/utils/RpcObject');
-const utilsStatsClient = require('./src/utils/statsClient');
 const UtilsServiceMeta = require('./src/utils/ServiceMeta');
 const UtilsContent = require('./src/utils/Content');
 const utilsDefaultStarter = require('./src/utils/defaultStarter');
 const UtilsGateClient = require('./src/utils/GateClient');
 const UtilsParallel = require('./src/utils/Parallel');
+const utilsMetrics = require('./src/utils/metrics');
 
 const TypesBigNum = require('./src/types/BigNum');
 const TypesMongoBigNum = require('./src/types/MongoBigNum');
@@ -40,12 +40,12 @@ module.exports = {
         Moments: UtilsMoments,
         Template: UtilsTemplate,
         RpcObject: UtilsRpcObject,
-        statsClient: utilsStatsClient,
         ServiceMeta: UtilsServiceMeta,
         Parallel: UtilsParallel,
         Content: UtilsContent,
         defaultStarter: utilsDefaultStarter,
         GateClient: UtilsGateClient,
+        metrics: utilsMetrics,
     },
     types: {
         BigNum: TypesBigNum,
