@@ -579,8 +579,10 @@ class Connector extends BasicService {
             status = 'success';
         }
 
+        const methodName = method.toLowerCase().replace(/[^a-z0-9]+/g, '');
+
         const general = `${type}_api_${status}`;
-        const details = `${type}_${method}_${status}`;
+        const details = `${type}_${methodName}_${status}`;
 
         metrics.inc(`${general}_count`);
         metrics.recordTime(`${general}_time`, time);
