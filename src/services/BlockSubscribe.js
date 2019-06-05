@@ -4,7 +4,7 @@ const BasicService = require('./Basic');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const ParallelUtils = require('../utils/Parallel');
-const stats = require('../utils/Stats').global();
+const metrics = require('../utils/metrics');
 
 // TODO Fork management
 /**
@@ -150,20 +150,20 @@ class BlockSubscribe extends BasicService {
     }
 
     async _handleTransactionApply(transaction) {
-        stats.inc('core:block.apply');
+        metrics.inc('core_block_apply');
 
         try {
             transaction.actions = transaction.actions.filter(action => action.data === '');
 
             this._pendingTransactionsBuffer.set(transaction.id, transaction);
         } catch (error) {
-            Logger.error(`Handle transaction error - ${error.stack}`);
+            Logger.error('Handle transaction error:', error);
             process.exit(1);
         }
     }
 
     async _handleBlockAccept(rawBlock) {
-        stats.inc('core:block.accept');
+        metrics.inc('core_block_accept');
 
         if (!rawBlock.validated || this._handledBlocksBuffer.has(rawBlock.id)) {
             return;
@@ -193,7 +193,7 @@ class BlockSubscribe extends BasicService {
 
     // do not make this method async, synchronous algorithm
     _handleBlockCommit({ block_num: irreversibleNum }) {
-        stats.inc('core:block.commit');
+        metrics.inc('core_block_commit');
 
         this.emit('irreversibleBlockNum', irreversibleNum);
 
@@ -262,9 +262,9 @@ class BlockSubscribe extends BasicService {
     _notifyByItem(block) {
         if (block.blockNum >= this._startFromBlock) {
             this.emit('block', block);
-            stats.inc('core:block.received');
+            metrics.inc('core_block_received');
         } else {
-            stats.inc('core:block.received-outdated');
+            metrics.inc('core_block_received_outdated');
             Logger.log(`Skip outdated block ${block.blockNum}`);
         }
     }
@@ -296,8 +296,8 @@ class BlockSubscribe extends BasicService {
             return;
         }
 
-        stats.inc('core:genesis.block.received');
-        stats.inc(`core:genesis.block.received.${type}`);
+        metrics.inc('core_genesis_block_received');
+        metrics.inc(`core_genesis_block_received_${type}`);
 
         if (type === 'datastart') {
             this._isGenesisStarted = true;
