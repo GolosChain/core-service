@@ -41,7 +41,7 @@ class LocalMetrics {
      * @param {number} value
      */
     set(metricName, value) {
-        this._values(metricName, value);
+        this._values.set(metricName, value);
     }
 
     /**
@@ -86,7 +86,7 @@ class LocalMetrics {
             prev = this._previous[type].get(key);
         }
 
-        if (value !== prev) {
+        if (prev !== undefined && value !== prev) {
             if (typeof value === 'number' && typeof prev === 'number') {
                 diff = value - (prev || 0);
             } else {

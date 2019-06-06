@@ -57,8 +57,6 @@ class BlockSubscribe extends BasicService {
         this._connection = null;
         this._currentBlockNum = Infinity;
         this._isFirstBlock = true;
-        this._isGenesisStarted = false;
-        this._isGenesisBeginningFailed = false;
 
         this._parallelUtils = new ParallelUtils();
     }
@@ -117,22 +115,13 @@ class BlockSubscribe extends BasicService {
         this.on('block', this._parallelUtils.consequentially(callback));
     }
 
-    /**
-     * Вызовет переданную функцию на каждый набор данных
-     * генезиса, при этом дождавшись выполнения этой функции
-     * используя await.
-     * Аргументы для функции аналогичны эвенту genesisData.
-     * @param {function} callback Обработчик.
-     */
-    eachGenesisData(callback) {
-        this.on('genesisData', this._parallelUtils.consequentially(callback));
-    }
-
     _connectToMessageBroker() {
         this._connection = nats.connect(
             this._serverName,
             this._clientName,
-            this._connectString
+            {
+                url: this._connectString,
+            }
         );
     }
 
@@ -141,7 +130,6 @@ class BlockSubscribe extends BasicService {
             this._makeMessageHandler('ApplyTrx', this._handleTransactionApply.bind(this));
             this._makeMessageHandler('AcceptBlock', this._handleBlockAccept.bind(this));
             this._makeMessageHandler('CommitBlock', this._handleBlockCommit.bind(this));
-            this._makeMessageHandler('GenesisData', this._handleGenesisData.bind(this));
         });
         this._connection.on('close', () => {
             Logger.error('Blockchain block broadcaster connection failed');
@@ -289,28 +277,6 @@ class BlockSubscribe extends BasicService {
             }
             await sleep(0);
         }
-    }
-
-    _handleGenesisData({ name: type, data }) {
-        if (this._isGenesisBeginningFailed) {
-            return;
-        }
-
-        metrics.inc('core_genesis_block_received');
-        metrics.inc(`core_genesis_block_received_${type}`);
-
-        if (type === 'datastart') {
-            this._isGenesisStarted = true;
-            return;
-        }
-
-        if (!this._isGenesisStarted) {
-            this._isGenesisBeginningFailed = true;
-            Logger.error('Genesis beginning are missed, need restart blockchain node!');
-            return;
-        }
-
-        this.emit('genesisData', type, data);
     }
 }
 
