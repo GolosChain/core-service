@@ -5,8 +5,7 @@ const jayson = require('jayson');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const BasicService = require('./Basic');
-const stats = require('../utils/statsClient');
-const ServiceMeta = require('../utils/ServiceMeta');
+const metrics = require('../utils/metrics');
 
 /**
  * Сервис связи между микросервисами.
@@ -129,7 +128,8 @@ const ServiceMeta = require('../utils/ServiceMeta');
  * ```
  *
  * Для удобства валидации можно добавить собственные типы валидации
- * основанные на базовых.
+ * основанные на базовых. Типы поддерживаются внутри конфигурации
+ * properties, а также внутри oneOf, anyOf и allOf.
  *
  * В данном примере мы добавляем и используем тип, который валидирует
  * параметр как строку, устанавливает максимальную длинну в 100 символов,
@@ -242,12 +242,14 @@ class Connector extends BasicService {
                     resolve(response);
                 }
 
-                this._reportStats({
-                    method: `${service}.${method}`,
-                    type: 'call',
-                    startTs,
-                    isError: Boolean(error),
-                });
+                if (env.GLS_EXTERNAL_CALLS_METRICS) {
+                    this._reportStats({
+                        type: 'call',
+                        method: `${service}.${method}`,
+                        startTs,
+                        isError: Boolean(error),
+                    });
+                }
             });
         });
     }
@@ -423,13 +425,15 @@ class Connector extends BasicService {
     }
 
     _resolveCustomTypesForValidation(validation, types) {
-        if (!validation.properties) {
-            return;
-        }
+        for (const propertyName of ['properties', 'oneOf', 'allOf', 'anyOf']) {
+            const validationInner = validation[propertyName];
 
-        for (const typeConfig of Object.values(validation.properties)) {
-            this._resolveValidationType(typeConfig, types);
-            this._resolveCustomTypesForValidation(typeConfig, types);
+            if (validationInner) {
+                for (const typeConfig of Object.values(validationInner)) {
+                    this._resolveValidationType(typeConfig, types);
+                    this._resolveCustomTypesForValidation(typeConfig, types);
+                }
+            }
         }
     }
 
@@ -523,8 +527,8 @@ class Connector extends BasicService {
             }
 
             this._reportStats({
-                method: route,
                 type: 'handle',
+                method: route,
                 startTs,
                 isError,
             });
@@ -566,7 +570,7 @@ class Connector extends BasicService {
         };
     }
 
-    _reportStats({ method, type, startTs, isError = false }) {
+    _reportStats({ type, method, startTs, isError = false }) {
         const time = Date.now() - startTs;
         let status;
 
@@ -576,14 +580,14 @@ class Connector extends BasicService {
             status = 'success';
         }
 
-        const serviceName = ServiceMeta.get('name');
-        const general = `${serviceName}:${type}_api_${status}`;
-        const details = `${serviceName}:${type}_${method}_${status}`;
+        const labels = {
+            api: method,
+        };
 
-        stats.increment(`${general}_count`);
-        stats.timing(`${general}_time`, time);
-        stats.increment(`${details}_count`);
-        stats.timing(`${details}_time`, time);
+        const metricNamePrefix = `${type}_api_${status}`;
+
+        metrics.inc(`${metricNamePrefix}_count`, labels);
+        metrics.recordTime(`${metricNamePrefix}_time`, time, labels);
     }
 
     _handleHandlerError(callback, error) {

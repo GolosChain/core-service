@@ -4,6 +4,7 @@ const BasicService = require('./Basic');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const ParallelUtils = require('../utils/Parallel');
+const metrics = require('../utils/metrics');
 
 // TODO Fork management
 /**
@@ -114,22 +115,13 @@ class BlockSubscribe extends BasicService {
         this.on('block', this._parallelUtils.consequentially(callback));
     }
 
-    /**
-     * Вызовет переданную функцию на каждый набор данных
-     * генезиса, при этом дождавшись выполнения этой функции
-     * используя await.
-     * Аргументы для функции аналогичны эвенту genesisData.
-     * @param {function} callback Обработчик.
-     */
-    eachGenesisData(callback) {
-        this.on('genesisData', this._parallelUtils.consequentially(callback));
-    }
-
     _connectToMessageBroker() {
         this._connection = nats.connect(
             this._serverName,
             this._clientName,
-            this._connectString
+            {
+                url: this._connectString,
+            }
         );
     }
 
@@ -138,7 +130,6 @@ class BlockSubscribe extends BasicService {
             this._makeMessageHandler('ApplyTrx', this._handleTransactionApply.bind(this));
             this._makeMessageHandler('AcceptBlock', this._handleBlockAccept.bind(this));
             this._makeMessageHandler('CommitBlock', this._handleBlockCommit.bind(this));
-            this._makeMessageHandler('GenesisData', this._handleGenesisData.bind(this));
         });
         this._connection.on('close', () => {
             Logger.error('Blockchain block broadcaster connection failed');
@@ -147,17 +138,21 @@ class BlockSubscribe extends BasicService {
     }
 
     async _handleTransactionApply(transaction) {
+        metrics.inc('core_block_apply');
+
         try {
             transaction.actions = transaction.actions.filter(action => action.data === '');
 
             this._pendingTransactionsBuffer.set(transaction.id, transaction);
         } catch (error) {
-            Logger.error(`Handle transaction error - ${error.stack}`);
+            Logger.error('Handle transaction error:', error);
             process.exit(1);
         }
     }
 
     async _handleBlockAccept(rawBlock) {
+        metrics.inc('core_block_accept');
+
         if (!rawBlock.validated || this._handledBlocksBuffer.has(rawBlock.id)) {
             return;
         }
@@ -186,6 +181,8 @@ class BlockSubscribe extends BasicService {
 
     // do not make this method async, synchronous algorithm
     _handleBlockCommit({ block_num: irreversibleNum }) {
+        metrics.inc('core_block_commit');
+
         this.emit('irreversibleBlockNum', irreversibleNum);
 
         if (!this._onlyIrreversible) {
@@ -253,7 +250,9 @@ class BlockSubscribe extends BasicService {
     _notifyByItem(block) {
         if (block.blockNum >= this._startFromBlock) {
             this.emit('block', block);
+            metrics.inc('core_block_received');
         } else {
+            metrics.inc('core_block_received_outdated');
             Logger.log(`Skip outdated block ${block.blockNum}`);
         }
     }
@@ -278,10 +277,6 @@ class BlockSubscribe extends BasicService {
             }
             await sleep(0);
         }
-    }
-
-    _handleGenesisData({ name: type, data }) {
-        this.emit('genesisData', type, data);
     }
 }
 

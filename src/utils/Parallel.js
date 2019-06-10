@@ -19,16 +19,39 @@ class Parallel {
      * @return {Function} Буфер вызова.
      */
     consequentially(callback) {
-        const queue = [];
-        const handle = this._makeQueueHandler(queue, callback);
-
-        return (...args) => {
-            queue.push(args);
-            handle();
+        const state = {
+            queue: [],
+            isCanceled: false,
+            callback,
         };
+
+        state.handle = this._makeQueueHandler(state);
+
+        const wrapperCallback = (...args) => {
+            if (state.isCanceled) {
+                throw new Error('Queue have been canceled');
+            }
+
+            state.queue.push(args);
+            state.handle();
+        };
+
+        wrapperCallback.getQueueLength = () => {
+            if (!state.queue) {
+                return 0;
+            }
+            return state.queue.length;
+        };
+
+        wrapperCallback.cancel = () => {
+            state.isCanceled = true;
+            state.queue = null;
+        };
+
+        return wrapperCallback;
     }
 
-    _makeQueueHandler(queue, callback) {
+    _makeQueueHandler(state) {
         let isProcessing = false;
 
         return async () => {
@@ -37,19 +60,19 @@ class Parallel {
             }
 
             isProcessing = true;
-            await this._handleQueue(queue, callback);
+            await this._handleQueue(state);
             isProcessing = false;
         };
     }
 
-    async _handleQueue(queue, callback) {
+    async _handleQueue(state) {
         let args;
 
-        while ((args = queue.shift())) {
+        while ((args = state.queue.shift())) {
             try {
-                await callback(...args);
+                await state.callback.apply(null, args);
             } catch (error) {
-                Logger.error('Consequentially queue failed:', error.stack);
+                Logger.error('Consequentially queue failed:', error);
                 process.exit(1);
             }
         }

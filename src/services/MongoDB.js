@@ -2,8 +2,7 @@ const mongoose = require('mongoose');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const BasicService = require('./Basic');
-const ServiceMeta = require('../utils/ServiceMeta');
-const stats = require('../utils/statsClient');
+const metrics = require('../utils/metrics');
 
 /**
  * Сервис взаимодействия с базой данных MongoDB.
@@ -84,8 +83,8 @@ class MongoDB extends BasicService {
             const connection = mongoose.connection;
 
             connection.on('error', error => {
-                stats.increment(`${ServiceMeta.get('name')}:mongo_error`);
-                Logger.error(`MongoDB - ${error.stack}`);
+                metrics.inc('mongo_error');
+                Logger.error('MongoDB error:', error);
                 process.exit(1);
             });
             connection.once('open', () => {
