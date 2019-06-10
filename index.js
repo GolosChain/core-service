@@ -16,6 +16,7 @@ const UtilsContent = require('./src/utils/Content');
 const utilsDefaultStarter = require('./src/utils/defaultStarter');
 const UtilsGateClient = require('./src/utils/GateClient');
 const UtilsParallel = require('./src/utils/Parallel');
+const UtilsUserRegister = require('./src/utils/UserRegister');
 const utilsMetrics = require('./src/utils/metrics');
 
 const TypesBigNum = require('./src/types/BigNum');
@@ -46,6 +47,7 @@ module.exports = {
         defaultStarter: utilsDefaultStarter,
         GateClient: UtilsGateClient,
         metrics: utilsMetrics,
+        UserRegister: UtilsUserRegister,
     },
     types: {
         BigNum: TypesBigNum,

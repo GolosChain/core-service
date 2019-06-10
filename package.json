@@ -47,5 +47,8 @@
         }
       }
     ]
+  },
+  "devDependencies": {
+    "prettier": "^1.18.2"
   }
 }
