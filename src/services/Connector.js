@@ -275,9 +275,9 @@ class Connector extends BasicService {
     /**
      * Ожидает обработки транзакции призмой
      * По истечении максимального времени ожидания вернет пустой промис
-     * @param transactionId id транзакции в БЧ
-     * @param prismServiceName название призмы в коннекторе; default='prism'
-     * @param maxWait максимальное время ожидания; default=10000
+     * @param {string} transactionId id транзакции в БЧ
+     * @param {string} prismServiceName название призмы в коннекторе; default='prism'
+     * @param {number} maxWait максимальное время ожидания; default=10000
      * @returns {Promise<any | void>}
      */
     async waitForTransaction(transactionId, { prismServiceName = 'prism', maxWait = 10000 }) {
@@ -289,8 +289,8 @@ class Connector extends BasicService {
 
     /**
      * Вызывает метод waitForTransaction призмы
-     * @param transactionId id транзакции в БЧ
-     * @param prismServiceName название призмы в коннекторе; default='prism'
+     * @param {string} transactionId id транзакции в БЧ
+     * @param {string} prismServiceName название призмы в коннекторе; default='prism'
      * @returns {Promise<void>}
      * @private
      */

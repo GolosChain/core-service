@@ -9,11 +9,11 @@ const { TextEncoder, TextDecoder } = require('text-encoding');
 class UserRegistration {
     /**
      * Конструктор, инициализирующий требуемую настройку для общения с БЧ
-     * @param blockChainConnectionString http-ендпоинт для подключения к БЧ
-     * @param registrarKey приватный ключ пользователя, осущетвляющего регистрацию (регистратора)
-     * @param creatorKey приватный ключ пользователя, осущетвляющего создание юзернейма (создателя)
-     * @param registrarAccount имя аккаунта-регистратора
-     * @param creatorAccount имя аккаунта-создателя
+     * @param {string} blockChainConnectionString http-ендпоинт для подключения к БЧ
+     * @param {string} registrarKey приватный ключ пользователя, осущетвляющего регистрацию (регистратора)
+     * @param {string} creatorKey приватный ключ пользователя, осущетвляющего создание юзернейма (создателя)
+     * @param {string} registrarAccount имя аккаунта-регистратора
+     * @param {string} creatorAccount имя аккаунта-создателя
      */
     constructor({
         blockChainConnectionString,
@@ -23,23 +23,23 @@ class UserRegistration {
         creatorAccount,
     }) {
         if (!blockChainConnectionString) {
-            throw new Error('Property "blockChainConnectionString is required"');
+            throw new Error('Property "blockChainConnectionString" is required');
         }
 
         if (!registrarKey) {
-            throw new Error('Property "registrarKey is required"');
+            throw new Error('Property "registrarKey" is required');
         }
 
         if (!creatorKey) {
-            throw new Error('Property "creatorKey is required"');
+            throw new Error('Property "creatorKey" is required');
         }
 
         if (!registrarAccount) {
-            throw new Error('Property "registrarAccount is required"');
+            throw new Error('Property "registrarAccount" is required');
         }
 
         if (!creatorAccount) {
-            throw new Error('Property "creatorAccount is required"');
+            throw new Error('Property "creatorAccount" is required');
         }
 
         this._blockChainConnectionString = blockChainConnectionString;
@@ -61,11 +61,11 @@ class UserRegistration {
 
     /**
      * Регистрирует пользователя с указанными параметрами
-     * @param name имя аккаунта
-     * @param alias юзернейм аккаунта
-     * @param owner owner-ключ
-     * @param active active-ключ
-     * @param posting posting-ключ
+     * @param {string} name имя аккаунта
+     * @param {string} alias юзернейм аккаунта
+     * @param {string} owner owner-ключ
+     * @param {string} active active-ключ
+     * @param {string} posting posting-ключ
      * @returns {Promise<string>} id тразакции на регистрацию
      */
     async registerUser(name, alias, { owner, active, posting }) {
@@ -86,6 +86,16 @@ class UserRegistration {
         return transactionId;
     }
 
+    /**
+     * Возвращает объект несериализованной транзакции регистрации
+     * @param {string} name имя аккаунта
+     * @param {string} alias юзернейм аккаунта
+     * @param {string} owner owner-ключ
+     * @param {string} active active-ключ
+     * @param {string} posting posting-ключ
+     * @returns {*} объект несериализованной транзакции регистрации
+     * @private
+     */
     _generateRegisterTransaction(name, alias, { owner, active, posting }) {
         return {
             actions: [
@@ -140,6 +150,12 @@ class UserRegistration {
         };
     }
 
+    /**
+     * Возвращает объект authority для ключа
+     * @param key ключ
+     * @returns {{waits: Array, keys: {weight: number, key: *}[], threshold: number, accounts: Array}}
+     * @private
+     */
     _generateAuthorityObject(key) {
         return { threshold: 1, keys: [{ key, weight: 1 }], accounts: [], waits: [] };
     }
