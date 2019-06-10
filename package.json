@@ -23,7 +23,7 @@
     "lodash.template": "^4.4.0",
     "moment": "^2.24.0",
     "mongoose": "^5.5.12",
-    "node-nats-streaming": "0.0.51",
+    "node-nats-streaming": "^0.2.2",
     "prom-client": "^11.5.0",
     "random": "^2.1.1",
     "sanitize-html": "^1.20.1",
