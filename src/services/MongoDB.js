@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const BasicService = require('./Basic');
-const ServiceMeta = require('../utils/ServiceMeta');
 const metrics = require('../utils/metrics');
 
 /**

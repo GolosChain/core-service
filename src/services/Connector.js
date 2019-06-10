@@ -243,12 +243,14 @@ class Connector extends BasicService {
                     resolve(response);
                 }
 
-                this._reportStats({
-                    method: `${service}.${method}`,
-                    type: 'call',
-                    startTs,
-                    isError: Boolean(error),
-                });
+                if (env.GLS_EXTERNAL_CALLS_METRICS) {
+                    this._reportStats({
+                        type: 'call',
+                        method: `${service}.${method}`,
+                        startTs,
+                        isError: Boolean(error),
+                    });
+                }
             });
         });
     }
@@ -562,8 +564,8 @@ class Connector extends BasicService {
             }
 
             this._reportStats({
-                method: route,
                 type: 'handle',
+                method: route,
                 startTs,
                 isError,
             });
@@ -605,7 +607,7 @@ class Connector extends BasicService {
         };
     }
 
-    _reportStats({ method, type, startTs, isError = false }) {
+    _reportStats({ type, method, startTs, isError = false }) {
         const time = Date.now() - startTs;
         let status;
 
@@ -615,15 +617,14 @@ class Connector extends BasicService {
             status = 'success';
         }
 
-        const methodName = method.toLowerCase().replace(/[^a-z0-9]+/g, '');
+        const labels = {
+            api: method,
+        };
 
-        const general = `${type}_api_${status}`;
-        const details = `${type}_${methodName}_${status}`;
+        const metricNamePrefix = `${type}_api_${status}`;
 
-        metrics.inc(`${general}_count`);
-        metrics.recordTime(`${general}_time`, time);
-        metrics.inc(`${details}_count`);
-        metrics.recordTime(`${details}_time`, time);
+        metrics.inc(`${metricNamePrefix}_count`, labels);
+        metrics.recordTime(`${metricNamePrefix}_time`, time, labels);
     }
 
     _handleHandlerError(callback, error) {
