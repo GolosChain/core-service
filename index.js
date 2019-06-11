@@ -16,8 +16,10 @@ const UtilsContent = require('./src/utils/Content');
 const utilsDefaultStarter = require('./src/utils/defaultStarter');
 const UtilsGateClient = require('./src/utils/GateClient');
 const UtilsParallel = require('./src/utils/Parallel');
+const UtilsUserRegister = require('./src/utils/UserRegister');
 const utilsMetrics = require('./src/utils/metrics');
 const UtilsParallelPool = require('./src/utils/ParallelPool');
+const utilsWaitForTransaction = require('./src/utils/waitForTransaction');
 const TypesBigNum = require('./src/types/BigNum');
 const TypesMongoBigNum = require('./src/types/MongoBigNum');
 
@@ -47,6 +49,8 @@ module.exports = {
         defaultStarter: utilsDefaultStarter,
         GateClient: UtilsGateClient,
         metrics: utilsMetrics,
+        UserRegister: UtilsUserRegister,
+        waitForTransaction: utilsWaitForTransaction,
     },
     types: {
         BigNum: TypesBigNum,

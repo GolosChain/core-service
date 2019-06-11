@@ -116,13 +116,9 @@ class BlockSubscribe extends BasicService {
     }
 
     _connectToMessageBroker() {
-        this._connection = nats.connect(
-            this._serverName,
-            this._clientName,
-            {
-                url: this._connectString,
-            }
-        );
+        this._connection = nats.connect(this._serverName, this._clientName, {
+            url: this._connectString,
+        });
     }
 
     _makeBlockHandlers() {
