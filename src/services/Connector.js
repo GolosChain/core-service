@@ -6,7 +6,6 @@ const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const BasicService = require('./Basic');
 const metrics = require('../utils/metrics');
-const sleep = require('then-sleep');
 
 /**
  * Сервис связи между микросервисами.
@@ -270,42 +269,6 @@ class Connector extends BasicService {
         }
 
         return response.result;
-    }
-
-    /**
-     * Ожидает обработки транзакции призмой
-     * По истечении максимального времени ожидания вернет пустой промис
-     * @param {string} transactionId id транзакции в БЧ
-     * @param {string} prismServiceName название призмы в коннекторе; default='prism'
-     * @param {number} maxWait максимальное время ожидания; default=10000
-     * @returns {Promise<any | void>}
-     */
-    async waitForTransaction(transactionId, { prismServiceName = 'prism', maxWait = 10000 }) {
-        return await Promise.race([
-            sleep(maxWait),
-            this._callPrismWaitForTransaction(transactionId, { prismServiceName }),
-        ]);
-    }
-
-    /**
-     * Вызывает метод waitForTransaction призмы
-     * @param {string} transactionId id транзакции в БЧ
-     * @param {string} prismServiceName название призмы в коннекторе; default='prism'
-     * @returns {Promise<void>}
-     * @private
-     */
-    async _callPrismWaitForTransaction(transactionId, { prismServiceName }) {
-        try {
-            await this.callService(prismServiceName, 'waitForTransaction', {
-                transactionId,
-            });
-        } catch (error) {
-            if (error.code !== 408 && error.code !== 'ECONNRESET' && error.code !== 'ETIMEDOUT') {
-                Logger.error(`Error calling ${prismServiceName}.waitForTransaction`, error);
-
-                throw error;
-            }
-        }
     }
 
     /**
