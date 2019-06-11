@@ -5,6 +5,8 @@ const { TextEncoder, TextDecoder } = require('text-encoding');
 
 /**
  * Класс, реализующий регистрацию пользователя в БЧ
+ * Регистрирует пользователя с переданным именем аккаунта, юзернеймом и ключами
+ * Открывает вестинг
  */
 class UserRegistration {
     /**
@@ -16,6 +18,47 @@ class UserRegistration {
      * @param {string} creatorAccount имя аккаунта-создателя
      */
     constructor({
+        blockChainConnectionString,
+        registrarKey,
+        creatorKey,
+        registrarAccount,
+        creatorAccount,
+    }) {
+        this._validateInput({
+            blockChainConnectionString,
+            registrarKey,
+            creatorKey,
+            registrarAccount,
+            creatorAccount,
+        });
+
+        this._blockChainConnectionString = blockChainConnectionString;
+        this._registrarKey = registrarKey;
+        this._creatorKey = creatorKey;
+        this._registrarAccount = registrarAccount;
+        this._creatorAccount = creatorAccount;
+
+        const rpc = new JsonRpc(this._blockChainConnectionString, { fetch });
+        const signatureProvider = new JsSignatureProvider([this._registrarKey, this._creatorKey]);
+
+        this._api = new Api({
+            rpc,
+            signatureProvider,
+            textDecoder: new TextDecoder(),
+            textEncoder: new TextEncoder(),
+        });
+    }
+
+    /**
+     * Валидирует входные параметры для конструктора
+     * @param {string} blockChainConnectionString http-ендпоинт для подключения к БЧ
+     * @param {string} registrarKey приватный ключ пользователя, осущетвляющего регистрацию (регистратора)
+     * @param {string} creatorKey приватный ключ пользователя, осущетвляющего создание юзернейма (создателя)
+     * @param {string} registrarAccount имя аккаунта-регистратора
+     * @param {string} creatorAccount имя аккаунта-создателя
+     * @throws {Error} Ошибка валидации
+     */
+    _validateInput({
         blockChainConnectionString,
         registrarKey,
         creatorKey,
@@ -41,22 +84,6 @@ class UserRegistration {
         if (!creatorAccount) {
             throw new Error('Property "creatorAccount" is required');
         }
-
-        this._blockChainConnectionString = blockChainConnectionString;
-        this._registrarKey = registrarKey;
-        this._creatorKey = creatorKey;
-        this._registrarAccount = registrarAccount;
-        this._creatorAccount = creatorAccount;
-
-        const rpc = new JsonRpc(this._blockChainConnectionString, { fetch });
-        const signatureProvider = new JsSignatureProvider([this._registrarKey, this._creatorKey]);
-
-        this._api = new Api({
-            rpc,
-            signatureProvider,
-            textDecoder: new TextDecoder(),
-            textEncoder: new TextEncoder(),
-        });
     }
 
     /**
@@ -122,7 +149,7 @@ class UserRegistration {
                     authorization: [
                         {
                             actor: this._creatorAccount,
-                            permission: 'active',
+                            permission: 'createuser',
                         },
                     ],
                     data: {
