@@ -105,10 +105,13 @@ class LocalMetrics {
             return;
         }
 
-        console.log(`== Stats (${new Date().toJSON()}) diff by ${this._interval}ms ==`);
+        // Импортируем в момент использования, чтобы избежать циклической зависимости
+        const Logger = require('./Logger');
+
+        Logger.info(`== Stats (${new Date().toJSON()}) diff by ${this._interval}ms ==`);
 
         for (const line of lines) {
-            console.log(line);
+            Logger.info(line);
         }
     }
 
@@ -122,7 +125,13 @@ class LocalMetrics {
         fs.writeFile(
             'stats.txt',
             `Stats by ${new Date().toJSON()}, diff by ${this._interval}ms\n\n${lines.join('\n')}\n`,
-            () => {}
+            err => {
+                if (err) {
+                    // Импортируем в момент использования, чтобы избежать циклической зависимости
+                    const Logger = require('./Logger');
+                    Logger.error(err);
+                }
+            }
         );
     }
 }
