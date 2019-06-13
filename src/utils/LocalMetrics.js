@@ -108,7 +108,7 @@ class LocalMetrics {
         // Импортируем в момент использования, чтобы избежать циклической зависимости
         const Logger = require('./Logger');
 
-        Logger.info(`== Stats (${new Date().toJSON()}) diff by ${this._interval}ms ==`);
+        Logger.info(`== Stats, diff by ${this._interval}ms ==`);
 
         for (const line of lines) {
             Logger.info(line);
