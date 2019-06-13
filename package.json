@@ -1,6 +1,6 @@
 {
   "name": "gls-core-service",
-  "version": "3.29.3",
+  "version": "3.29.4",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -26,7 +26,7 @@
     "mongoose": "^5.5.15",
     "node-fetch": "^2.6.0",
     "node-nats-streaming": "^0.2.2",
-    "prom-client": "^11.5.0",
+    "prom-client": "^11.5.1",
     "random": "^2.1.1",
     "sanitize-html": "^1.20.1",
     "text-encoding": "^0.7.0",
