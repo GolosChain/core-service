@@ -1,5 +1,4 @@
 const fs = require('fs');
-const Logger = require('./Logger');
 
 class LocalMetrics {
     constructor({ type = 'log', interval = null } = {}) {
@@ -106,10 +105,10 @@ class LocalMetrics {
             return;
         }
 
-        Logger.info(`== Stats, diff by ${this._interval}ms ==`);
+        console.log(`== Stats (${new Date().toJSON()}) diff by ${this._interval}ms ==`);
 
         for (const line of lines) {
-            Logger.info(line);
+            console.log(line);
         }
     }
 
@@ -121,16 +120,9 @@ class LocalMetrics {
         }
 
         fs.writeFile(
-            '.stats.txt',
+            'stats.txt',
             `Stats by ${new Date().toJSON()}, diff by ${this._interval}ms\n\n${lines.join('\n')}\n`,
-            err => {
-                if (err) {
-                    Logger.error('Stats logging failed:', err);
-                    return;
-                }
-
-                fs.rename('.stats.txt', 'stats.txt', () => {});
-            }
+            () => {}
         );
     }
 }
