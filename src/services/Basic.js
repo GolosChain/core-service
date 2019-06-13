@@ -95,7 +95,7 @@ class Basic {
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async restore(...args) {
-        // Do nothing for now
+        // Do nothing
     }
 
     /**
