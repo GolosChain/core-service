@@ -58,7 +58,7 @@ class PrometheusMetrics {
      * @param {Object} [labels]
      */
     set(metricName, value, labels) {
-        const gauge = this._getGauge(labels, metricName);
+        const gauge = this._getGauge(metricName, labels);
 
         if (labels) {
             gauge.set(labels, value);

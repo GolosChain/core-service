@@ -176,7 +176,7 @@ class Basic {
      */
     throwOnUnhandledPromiseRejection() {
         process.on('unhandledRejection', error => {
-            Logger.error('Unhandled promise rejection - ', error.stack);
+            Logger.error('Unhandled promise rejection:', error);
             process.exit(1);
         });
     }
