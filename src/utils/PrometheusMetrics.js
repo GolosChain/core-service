@@ -147,7 +147,7 @@ class PrometheusMetrics {
 
     _getLabelNames(labels) {
         if (!labels) {
-            return undefined;
+            return [];
         }
 
         return Object.keys(labels).sort();
