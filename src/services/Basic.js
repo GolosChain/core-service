@@ -71,22 +71,21 @@ class Basic {
     }
 
     /**
-     * Абстрактный метод старта сервиса.
+     * Старт сервиса.
      * @param {...*} [args] Аргументы.
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async start(...args) {
-        throw 'No service start logic';
+        await this.startNested();
     }
 
     /**
-     * Абстрактный метод остановки сервиса, не требудет необходимости
-     * в имплементации.
+     * Остановка сервиса.
      * @param {...*} [args] Аргументы.
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async stop(...args) {
-        // Do nothing for now
+        await this.stopNested();
     }
 
     /**
@@ -96,7 +95,7 @@ class Basic {
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async restore(...args) {
-        // Do nothing for now
+        // Do nothing
     }
 
     /**
@@ -105,7 +104,7 @@ class Basic {
      * @returns {Promise<void>} Промис без экстра данных.
      */
     async retry(...args) {
-        throw 'No retry logic';
+        // Do nothing
     }
 
     /**
@@ -119,7 +118,7 @@ class Basic {
     }
 
     /**
-     * Добавляет 1 или более сервисов в зависимость к этому сервису.
+     * Добавляет сервисы в зависимость к этому сервису.
      * @param {Basic} services Сервисы.
      */
     addNested(...services) {
