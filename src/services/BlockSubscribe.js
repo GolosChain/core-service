@@ -328,6 +328,7 @@ class BlockSubscribe extends BasicService {
 
         const blockData = {
             id: block.id,
+            parentId: block.previous,
             sequence: block.sequence,
             blockNum: block.block_num,
             blockTime,
