@@ -6,6 +6,8 @@ const Logger = require('../utils/Logger');
 const ParallelUtils = require('../utils/Parallel');
 const metrics = require('../utils/metrics');
 
+const HOLD_TRANSACTIONS_TIME = 5 * 60 * 1000;
+
 // TODO Fork management
 /**
  * Сервис подписки получения новых блоков.
@@ -19,44 +21,53 @@ const metrics = require('../utils/metrics');
  */
 class BlockSubscribe extends BasicService {
     /**
-     * @param {number} startFromBlock
-     * Номер блока, с которого нужно начать подписку.
-     * Более ранние блоки будут проигнорированны.
      * В случае если очередь блокчейн-ноды уже не хранит необходимые
-     * старые блоки - блоки могут быть пропущены (в текущей версии).
+     * блоки будет выведено предупреждение.
+     * TODO: Если нужные сообщения в nats уже исчезли надо что-то делать!
+     * @param {number} lastSequence
+     *   Номер сообщения в nats, с которого нужно начать обработку.
+     * @param {Date|string} lastTime
+     *   Дата последней успешной обработки, с которого нужно начать обработку.
      * @param {boolean} [onlyIrreversible]
-     * В случае true эвенты будут возвращать только неоткатные блоки,
-     * игнорируя те блоки что блокчейн ещё не пометил неоткатными.
+     *   В случае true эвенты будут возвращать только неоткатные блоки
+     * @param {boolean} [includeExpiredTransactions]
+     *   Если не нужно отбрасывать протухшие транзакции
      * @param {string} [serverName]
-     * Имя сервера для подписки, в ином случае берется из env.
+     *   Имя сервера для подписки, в ином случае берется из env.
      * @param {string} [clientName]
-     * Имя клиента, предоставляемое серверу, в ином случае берется из env.
+     *   Имя клиента, предоставляемое серверу, в ином случае берется из env.
      * @param {string} [connectString]
-     * Строка подключения (с авторизацией), в ином случае берется из env.
+     *   Строка подключения (с авторизацией), в ином случае берется из env.
      */
-    constructor(
-        startFromBlock = 0,
-        {
-            onlyIrreversible = false,
-            serverName = env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
-            clientName = env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
-            connectString = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
-        } = {}
-    ) {
+    constructor({
+        lastSequence = 0,
+        lastTime = null,
+        onlyIrreversible = false,
+        includeExpiredTransactions = false,
+        serverName = env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
+        clientName = env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
+        connectString = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
+    } = {}) {
         super();
 
+        this._connection = null;
+
+        this._lastProcessedSequence = lastSequence || 0;
+        this._lastBlockTime = lastTime;
         this._onlyIrreversible = onlyIrreversible;
+        this._includeExpired = includeExpiredTransactions;
         this._serverName = serverName;
         this._clientName = clientName;
         this._connectString = connectString;
 
-        this._startFromBlock = startFromBlock;
-        this._reversibleBlockBuffer = [];
-        this._pendingTransactionsBuffer = new Map();
-        this._handledBlocksBuffer = new Map();
-        this._connection = null;
-        this._currentBlockNum = Infinity;
-        this._isFirstBlock = true;
+        this._transactions = new Map();
+        this._recentTransactions = new Set();
+        this._oldTransactions = new Set();
+        this._acceptedBlocksQueue = new Map();
+        this._completeBlocksQueue = [];
+        this._currentBlock = null;
+        this._subscribers = {};
+        this._lastEmittedBlockNum = null;
 
         this._parallelUtils = new ParallelUtils();
     }
@@ -72,13 +83,6 @@ class BlockSubscribe extends BasicService {
      */
 
     /**
-     * Вызывается в случае получения данных из генезис-блока.
-     * @event genesisData
-     * @property {String} type Тип генезис-данных.
-     * @property {Object} data Генезис-данные.
-     */
-
-    /**
      * Не работает в текущей версии!
      *
      * Вызывается в случае обнаружения форка, оповещает о номере блока,
@@ -89,25 +93,22 @@ class BlockSubscribe extends BasicService {
 
     /**
      * Оповещает об текущем номере неоткатного блока.
-     * @property {number} irreversibleBlockNum Номер неоткатного блока.
      * @event irreversibleBlockNum
+     * @property {number} irreversibleBlockNum Номер неоткатного блока.
      */
 
     /**
      * Запуск сервиса.
-     * Предполагается что слушатели на эвенты установлены до запуска.
-     * @returns {Promise<void>} Промис без экстра данных.
+     * @async
      */
     async start() {
         this._connectToMessageBroker();
-        this._makeBlockHandlers();
-        this._makeCleaners();
+        this._startCleaners();
     }
 
     /**
-     * Вызовет переданную функцию на каждый блок, полученный
-     * из блокчейна, при этом дождавшись её выполнения
-     * используя await.
+     * Вызовет переданную функцию на каждый блок, полученный из блокчейна,
+     * при этом дождавшись её выполнения используя await.
      * Аргументы для функции аналогичны эвенту block.
      * @param {function} callback Обработчик.
      */
@@ -116,6 +117,8 @@ class BlockSubscribe extends BasicService {
     }
 
     _connectToMessageBroker() {
+        let isConnectionClosed = false;
+
         this._connection = nats.connect(
             this._serverName,
             this._clientName,
@@ -123,159 +126,319 @@ class BlockSubscribe extends BasicService {
                 url: this._connectString,
             }
         );
-    }
 
-    _makeBlockHandlers() {
         this._connection.on('connect', () => {
-            this._makeMessageHandler('ApplyTrx', this._handleTransactionApply.bind(this));
-            this._makeMessageHandler('AcceptBlock', this._handleBlockAccept.bind(this));
-            this._makeMessageHandler('CommitBlock', this._handleBlockCommit.bind(this));
+            Logger.log('Blockchain block broadcaster connected.');
+            this._subscribe();
         });
+
         this._connection.on('close', () => {
-            Logger.error('Blockchain block broadcaster connection failed');
-            process.exit(1);
+            if (!isConnectionClosed) {
+                isConnectionClosed = true;
+                this._unsubscribe();
+                this._scheduleReconnect();
+            }
+        });
+
+        this._connection.on('error', err => {
+            if (!isConnectionClosed) {
+                isConnectionClosed = true;
+
+                if (err.code !== 'BAD_SUBJECT') {
+                    Logger.error('Nats "error" event:', err);
+                }
+
+                try {
+                    this._connection.close();
+                } catch (err) {}
+
+                this._unsubscribe();
+                this._scheduleReconnect();
+            }
         });
     }
 
-    async _handleTransactionApply(transaction) {
-        metrics.inc('core_block_apply');
+    _scheduleReconnect() {
+        Logger.warn('Blockchain block broadcaster connection closed, reconnect scheduled.');
 
-        try {
-            transaction.actions = transaction.actions.filter(action => action.data === '');
+        setTimeout(() => {
+            this._connectToMessageBroker();
+        }, 5000);
+    }
 
-            this._pendingTransactionsBuffer.set(transaction.id, transaction);
-        } catch (error) {
-            Logger.error('Handle transaction error:', error);
-            process.exit(1);
+    _subscribe() {
+        this._subscribeApplyTrx();
+        this._subscribeAcceptBlock();
+        this._subscribeCommitBlock();
+    }
+
+    _unsubscribe() {
+        for (const { subscriber, handler } of Object.values(this._subscribers)) {
+            subscriber.removeListener('message', handler);
+
+            try {
+                subscriber.unsubscribe();
+            } catch {
+                // Do nothing
+            }
+        }
+
+        this._subscribers = {};
+    }
+
+    _subscribeAcceptBlock() {
+        const options = this._connection.subscriptionOptions();
+        options.setStartAtSequence(this._lastProcessedSequence + 1);
+
+        this._subscribeOnEvents(
+            'AcceptBlock',
+            options,
+            'core_block_accept',
+            this._handleBlockAccept
+        );
+    }
+
+    _subscribeApplyTrx() {
+        const options = this._connection.subscriptionOptions();
+
+        if (this._lastBlockTime) {
+            const startTime = new Date(this._lastBlockTime);
+            startTime.setMinutes(startTime.getMinutes() - 30);
+            options.setStartTime(startTime);
+        } else {
+            options.setDeliverAllAvailable();
+        }
+
+        this._subscribeOnEvents(
+            'ApplyTrx',
+            options,
+            'core_trx_apply',
+            this._handleTransactionApply
+        );
+    }
+
+    _subscribeCommitBlock() {
+        const commitOptions = this._connection.subscriptionOptions();
+        commitOptions.setStartWithLastReceived();
+
+        this._subscribeOnEvents(
+            'CommitBlock',
+            commitOptions,
+            'core_block_commit',
+            this._handleBlockCommit
+        );
+    }
+
+    _subscribeOnEvents(eventName, options, metricName, handler) {
+        const subscriber = this._connection.subscribe(eventName, options);
+
+        const handlerWrapper = message => {
+            const data = this._parseMessageData(message);
+            handler.call(this, data);
+            metrics.inc(metricName);
+        };
+
+        subscriber.on('message', handlerWrapper);
+
+        this._subscribers[eventName] = {
+            subscriber,
+            handler: handlerWrapper,
+        };
+    }
+
+    _handleTransactionApply({ data: transaction }) {
+        this._recentTransactions.add(transaction.id);
+        this._transactions.set(transaction.id, transaction);
+
+        if (this._currentBlock) {
+            this._tryToAcceptCurrentBlock();
         }
     }
 
-    async _handleBlockAccept(rawBlock) {
-        metrics.inc('core_block_accept');
-
-        if (!rawBlock.validated || this._handledBlocksBuffer.has(rawBlock.id)) {
+    _handleBlockAccept({ data: block, sequence }) {
+        if (sequence <= this._lastProcessedSequence) {
+            Logger.warn('Received message with sequence less or equal than already processed.');
+            Logger.warn(
+                `Last processed: ${this._lastProcessedSequence}, received sequence: ${sequence}`
+            );
             return;
         }
 
-        this._currentBlockNum = rawBlock.block_num;
+        if (!block.validated) {
+            return;
+        }
 
-        try {
-            const transactions = this._extractPendingTransactions(rawBlock);
+        block.sequence = sequence;
 
-            if (this._isFirstBlock) {
-                this._isFirstBlock = false;
+        if (this._lastProcessedSequence && this._lastProcessedSequence + 1 !== sequence) {
+            this._acceptedBlocksQueue.set(sequence, block);
+            return;
+        }
 
-                if (transactions.some(val => !val)) {
-                    // skip defective block
-                    return;
-                }
+        this._currentBlock = block;
+
+        this._tryToAcceptCurrentBlock();
+    }
+
+    _tryToAcceptCurrentBlock() {
+        const block = this._currentBlock;
+        const transactions = [];
+
+        for (const trxMeta of block.trxs) {
+            const trx = this._transactions.get(trxMeta.id);
+
+            if (!this._includeExpired && trxMeta.status === 'expired') {
+                continue;
             }
 
-            this._insertInQueue(rawBlock, transactions);
-            this._handledBlocksBuffer.set(rawBlock.id, rawBlock.block_num);
-        } catch (error) {
-            Logger.error(`Handle block error - ${error.stack}`);
-            process.exit(1);
+            // Если нет нужной транзакции, то прекращаем обработку, и при каждой
+            // новой транзакции проверяем снова весь список.
+            if (!trx) {
+                return;
+            }
+
+            const stats = { ...trxMeta };
+            delete stats.id;
+            delete stats.status;
+
+            transactions.push({
+                id: trx.id,
+                actions: trx.actions,
+                status: trxMeta.status,
+                stats,
+            });
+        }
+
+        for (const { id } of transactions) {
+            this._transactions.delete(id);
+        }
+
+        let time = block.block_time;
+
+        // Convert invalid format
+        // "2019-06-13T19:31:13.838" (without time zone) into
+        // "2019-06-13T19:31:13.838Z"
+        if (time.length === 23) {
+            time += 'Z';
+        }
+
+        const blockTime = new Date(time);
+
+        this._lastBlockTime = blockTime;
+
+        const blockData = {
+            id: block.id,
+            sequence: block.sequence,
+            blockNum: block.block_num,
+            blockTime,
+            transactions,
+        };
+
+        if (this._onlyIrreversible) {
+            this._completeBlocksQueue.push(blockData);
+            this._processIrreversibleBlocks();
+        } else {
+            this._emitBlock(blockData);
+        }
+
+        this._currentBlock = null;
+        this._lastProcessedSequence = block.sequence;
+
+        this._checkBlockQueue();
+    }
+
+    _checkBlockQueue() {
+        const nextSequence = this._lastProcessedSequence + 1;
+
+        if (this._acceptedBlocksQueue.has(nextSequence)) {
+            this._setCurrentBlock(this._acceptedBlocksQueue.get(nextSequence));
+            this._acceptedBlocksQueue.delete(nextSequence);
+
+            this._tryToAcceptCurrentBlock();
         }
     }
 
-    // do not make this method async, synchronous algorithm
-    _handleBlockCommit({ block_num: irreversibleNum }) {
-        metrics.inc('core_block_commit');
+    _setCurrentBlock(block) {
+        this._currentBlock = block;
+
+        setTimeout(() => {
+            if (this._currentBlock === block) {
+                Logger.error(
+                    `Transactions wait timeout reached, blockId: ${block.id} blockNum: ${
+                        block.block_num
+                    }`
+                );
+                process.exit(1);
+            }
+        }, HOLD_TRANSACTIONS_TIME);
+    }
+
+    _handleBlockCommit({ data: block }) {
+        const { block_num: irreversibleNum } = block;
+
+        this._lastIrreversibleNum = irreversibleNum;
 
         this.emit('irreversibleBlockNum', irreversibleNum);
 
-        if (!this._onlyIrreversible) {
-            return;
+        if (this._onlyIrreversible) {
+            this._processIrreversibleBlocks();
         }
+    }
 
-        let block;
+    _processIrreversibleBlocks() {
+        while (this._completeBlocksQueue.length) {
+            const block = this._completeBlocksQueue[0];
 
-        while ((block = this._reversibleBlockBuffer.shift())) {
-            if (block.blockNum <= irreversibleNum) {
-                this._notifyByItem(block);
+            if (block.blockNum <= this._lastIrreversibleNum) {
+                this._completeBlocksQueue.shift();
+                this._emitBlock(block);
             } else {
-                this._reversibleBlockBuffer.unshift(block);
+                // Дальше идти нет смысла, потому что в массиве блоки упорядочены по blockNum
                 break;
             }
         }
     }
 
-    _extractPendingTransactions(rawBlock) {
-        const transactions = [];
-
-        for (const { id } of rawBlock.trxs) {
-            transactions.push(this._pendingTransactionsBuffer.get(id));
-            this._pendingTransactionsBuffer.delete(id);
+    _emitBlock(block) {
+        if (this._lastEmittedBlockNum && block.blockNum !== this._lastEmittedBlockNum + 1) {
+            Logger.error('Unordered blocks emitting!');
+            Logger.error(
+                `Previous blockNum: ${this._lastEmittedBlockNum}, current blockNum: ${
+                    block.blockNum
+                }`
+            );
+            process.exit(1);
         }
 
-        return transactions;
-    }
-
-    _insertInQueue(rawBlock, transactions) {
-        const block = {
-            id: rawBlock.id,
-            blockNum: rawBlock.block_num,
-            blockTime: new Date(rawBlock.block_time),
-            transactions,
-        };
-
-        if (this._onlyIrreversible) {
-            this._reversibleBlockBuffer.push(block);
-        } else {
-            this._notifyByItem(block);
-        }
-    }
-
-    _makeMessageHandler(type, callback) {
-        const delta = env.GLS_BLOCK_SUBSCRIBER_REPLAY_TIME_DELTA;
-        const opts = this._connection
-            .subscriptionOptions()
-            .setStartWithLastReceived()
-            .setStartAtTimeDelta(delta);
-        const subscription = this._connection.subscribe(type, opts);
-
-        subscription.on('message', message => callback.call(this, this._parseMessageData(message)));
+        metrics.inc('core_block_received');
+        this.emit('block', block);
     }
 
     _parseMessageData(message) {
         try {
-            return JSON.parse(message.getData());
+            return {
+                sequence: message.getSequence(),
+                data: JSON.parse(message.getData()),
+            };
         } catch (error) {
-            Logger.error(`Invalid blockchain message - ${error.stack}`);
+            Logger.error('Invalid blockchain message:', error);
             process.exit(1);
         }
     }
 
-    _notifyByItem(block) {
-        if (block.blockNum >= this._startFromBlock) {
-            this.emit('block', block);
-            metrics.inc('core_block_received');
-        } else {
-            metrics.inc('core_block_received_outdated');
-            Logger.log(`Skip outdated block ${block.blockNum}`);
-        }
-    }
-
-    _makeCleaners() {
-        const interval = env.GLS_BLOCK_SUBSCRIBER_CLEANER_INTERVAL;
-
+    _startCleaners() {
         setInterval(() => {
-            this._removeOldDuplicateBlockFilters().catch(error => {
-                Logger.error(`Cant remove old dup block filters - ${error.stack}`);
-                process.exit(1);
-            });
-        }, interval);
+            this._removeOldTransactions();
+        }, HOLD_TRANSACTIONS_TIME);
     }
 
-    async _removeOldDuplicateBlockFilters() {
-        const lastBlockStore = env.GLS_BLOCK_SUBSCRIBER_LAST_BLOCK_STORE;
+    _removeOldTransactions() {
+        const removeIds = this._oldTransactions;
+        this._oldTransactions = this._recentTransactions;
+        this._recentTransactions = new Set();
 
-        for (const [id, blockNum] of this._handledBlocksBuffer) {
-            if (blockNum < this._currentBlockNum - lastBlockStore) {
-                this._handledBlocksBuffer.delete(id);
-            }
-            await sleep(0);
+        for (const id of removeIds) {
+            this._transactions.delete(id);
         }
     }
 }
