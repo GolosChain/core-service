@@ -1,4 +1,3 @@
-const sleep = require('then-sleep');
 const nats = require('node-nats-streaming');
 const BasicService = require('./Basic');
 const env = require('../data/env');
@@ -7,6 +6,7 @@ const ParallelUtils = require('../utils/Parallel');
 const metrics = require('../utils/metrics');
 
 const HOLD_TRANSACTIONS_TIME = 5 * 60 * 1000;
+const RECENT_BLOCKS_TIME_DELTA = 60 * 1000;
 
 // TODO Fork management
 /**
@@ -56,7 +56,11 @@ class BlockSubscribe extends BasicService {
         this._onConnectionClose = this._onConnectionClose.bind(this);
         this._onConnectionError = this._onConnectionError.bind(this);
 
-        this._lastProcessedSequence = lastSequence || 0;
+        if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
+            this._lastProcessedSequence = null;
+        } else {
+            this._lastProcessedSequence = lastSequence || 0;
+        }
         this._lastBlockTime = lastTime;
         this._onlyIrreversible = onlyIrreversible;
         this._includeExpired = includeExpiredTransactions;
@@ -197,7 +201,12 @@ class BlockSubscribe extends BasicService {
 
     _subscribeAcceptBlock() {
         const options = this._connection.subscriptionOptions();
-        options.setStartAtSequence(this._lastProcessedSequence + 1);
+
+        if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
+            options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA);
+        } else {
+            options.setStartAtSequence(this._lastProcessedSequence + 1);
+        }
 
         this._subscribeOnEvents(
             'AcceptBlock',
@@ -210,12 +219,18 @@ class BlockSubscribe extends BasicService {
     _subscribeApplyTrx() {
         const options = this._connection.subscriptionOptions();
 
-        if (this._lastBlockTime) {
-            const startTime = new Date(this._lastBlockTime);
-            startTime.setMinutes(startTime.getMinutes() - 30);
-            options.setStartTime(startTime);
+        if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
+            // Для транзакций ставим интервал с двухкратным запасом,
+            // чтобы скачались все транзакции нужные для первого блока
+            options.setStartAtTimeDelta(2 * RECENT_BLOCKS_TIME_DELTA);
         } else {
-            options.setDeliverAllAvailable();
+            if (this._lastBlockTime) {
+                const startTime = new Date(this._lastBlockTime);
+                startTime.setMinutes(startTime.getMinutes() - 30);
+                options.setStartTime(startTime);
+            } else {
+                options.setDeliverAllAvailable();
+            }
         }
 
         this._subscribeOnEvents(
@@ -265,11 +280,18 @@ class BlockSubscribe extends BasicService {
     }
 
     _handleBlockAccept({ data: block, sequence }) {
+        // Условие работет только при включенном GLS_USE_ONLY_RECENT_BLOCKS
+        if (this._lastProcessedSequence === null) {
+            this._lastProcessedSequence = sequence - 1;
+        }
+
         if (sequence <= this._lastProcessedSequence) {
-            Logger.warn('Received message with sequence less or equal than already processed.');
-            Logger.warn(
-                `Last processed: ${this._lastProcessedSequence}, received sequence: ${sequence}`
-            );
+            if (!env.GLS_USE_ONLY_RECENT_BLOCKS) {
+                Logger.warn('Received message with sequence less or equal than already processed.');
+                Logger.warn(
+                    `Last processed: ${this._lastProcessedSequence}, received sequence: ${sequence}`
+                );
+            }
             return;
         }
 

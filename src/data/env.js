@@ -20,6 +20,8 @@ module.exports = {
     GLS_EXTERNAL_CALLS_METRICS:
         Boolean(env.GLS_EXTERNAL_CALLS_METRICS) && env.GLS_EXTERNAL_CALLS_METRICS !== 'false',
     GLS_SYSTEM_METRICS: Boolean(env.GLS_SYSTEM_METRICS) && env.GLS_SYSTEM_METRICS !== 'false',
+    GLS_USE_ONLY_RECENT_BLOCKS:
+        Boolean(env.GLS_USE_ONLY_RECENT_BLOCKS) && env.GLS_USE_ONLY_RECENT_BLOCKS !== 'false',
     GLS_LOCAL_METRICS: parseLocalMetricsEnv(),
 };
 
