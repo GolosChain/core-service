@@ -29,8 +29,16 @@ class LocalMetrics {
      * @param {number} [count=1]
      */
     inc(metricName, count = 1) {
+        let increment;
+
+        if (typeof count === 'number') {
+            increment = count;
+        } else {
+            increment = 1;
+        }
+
         const value = this._values.get(metricName) || 0;
-        this._values.set(metricName, value + count);
+        this._values.set(metricName, value + increment);
     }
 
     /**
