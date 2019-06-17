@@ -155,10 +155,6 @@ class BlockSubscribe extends BasicService {
             Logger.error('Nats "error" event:', err);
         }
 
-        try {
-            this._connection.close();
-        } catch (err) {}
-
         this._unsubscribe();
         this._scheduleReconnect();
     }
@@ -196,6 +192,10 @@ class BlockSubscribe extends BasicService {
                 // Do nothing
             }
         }
+
+        try {
+            this._connection.close();
+        } catch (err) {}
 
         this._subscribers = {};
         this._connection = null;
