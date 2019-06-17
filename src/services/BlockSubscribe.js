@@ -6,7 +6,7 @@ const ParallelUtils = require('../utils/Parallel');
 const metrics = require('../utils/metrics');
 
 const HOLD_TRANSACTIONS_TIME = 5 * 60 * 1000;
-const RECENT_BLOCKS_TIME_DELTA = 60 * 1000;
+const RECENT_BLOCKS_TIME_DELTA = 10 * 60 * 1000;
 
 // TODO Fork management
 /**
@@ -58,8 +58,10 @@ class BlockSubscribe extends BasicService {
 
         if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
             this._lastProcessedSequence = null;
+            this._isRecentSubscribeMode = true;
         } else {
             this._lastProcessedSequence = lastSequence || 0;
+            this._isRecentSubscribeMode = false;
         }
         this._lastBlockTime = lastTime;
         this._onlyIrreversible = onlyIrreversible;
@@ -202,7 +204,7 @@ class BlockSubscribe extends BasicService {
     _subscribeAcceptBlock() {
         const options = this._connection.subscriptionOptions();
 
-        if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
+        if (this._isRecentSubscribeMode) {
             options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA);
         } else {
             options.setStartAtSequence(this._lastProcessedSequence + 1);
@@ -219,10 +221,10 @@ class BlockSubscribe extends BasicService {
     _subscribeApplyTrx() {
         const options = this._connection.subscriptionOptions();
 
-        if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
+        if (this._isRecentSubscribeMode) {
             // Для транзакций ставим интервал с двухкратным запасом,
             // чтобы скачались все транзакции нужные для первого блока
-            options.setStartAtTimeDelta(2 * RECENT_BLOCKS_TIME_DELTA);
+            options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA + HOLD_TRANSACTIONS_TIME);
         } else {
             if (this._lastBlockTime) {
                 const startTime = new Date(this._lastBlockTime);
@@ -280,8 +282,7 @@ class BlockSubscribe extends BasicService {
     }
 
     _handleBlockAccept({ data: block, sequence }) {
-        // Условие работет только при включенном GLS_USE_ONLY_RECENT_BLOCKS
-        if (this._lastProcessedSequence === null) {
+        if (env.GLS_USE_ONLY_RECENT_BLOCKS && this._lastProcessedSequence === null) {
             this._lastProcessedSequence = sequence - 1;
         }
 
@@ -387,6 +388,7 @@ class BlockSubscribe extends BasicService {
             this._emitBlock(blockData);
         }
 
+        this._isRecentSubscribeMode = false;
         this._currentBlock = null;
         this._lastProcessedSequence = block.sequence;
     }
