@@ -52,6 +52,10 @@ class BlockSubscribe extends BasicService {
 
         this._connection = null;
 
+        this._onConnectionConnect = this._onConnectionConnect.bind(this);
+        this._onConnectionClose = this._onConnectionClose.bind(this);
+        this._onConnectionError = this._onConnectionError.bind(this);
+
         this._lastProcessedSequence = lastSequence || 0;
         this._lastBlockTime = lastTime;
         this._onlyIrreversible = onlyIrreversible;
@@ -117,8 +121,6 @@ class BlockSubscribe extends BasicService {
     }
 
     _connectToMessageBroker() {
-        let isConnectionClosed = false;
-
         this._connection = nats.connect(
             this._serverName,
             this._clientName,
@@ -127,35 +129,32 @@ class BlockSubscribe extends BasicService {
             }
         );
 
-        this._connection.on('connect', () => {
-            Logger.log('Blockchain block broadcaster connected.');
-            this._subscribe();
-        });
+        this._connection.on('connect', this._onConnectionConnect);
+        this._connection.on('close', this._onConnectionClose);
+        this._connection.on('error', this._onConnectionError);
+    }
 
-        this._connection.on('close', () => {
-            if (!isConnectionClosed) {
-                isConnectionClosed = true;
-                this._unsubscribe();
-                this._scheduleReconnect();
-            }
-        });
+    _onConnectionConnect() {
+        Logger.log('Blockchain block broadcaster connected.');
+        this._subscribe();
+    }
 
-        this._connection.on('error', err => {
-            if (!isConnectionClosed) {
-                isConnectionClosed = true;
+    _onConnectionClose() {
+        this._unsubscribe();
+        this._scheduleReconnect();
+    }
 
-                if (err.code !== 'BAD_SUBJECT') {
-                    Logger.error('Nats "error" event:', err);
-                }
+    _onConnectionError(err) {
+        if (err.code !== 'BAD_SUBJECT') {
+            Logger.error('Nats "error" event:', err);
+        }
 
-                try {
-                    this._connection.close();
-                } catch (err) {}
+        try {
+            this._connection.close();
+        } catch (err) {}
 
-                this._unsubscribe();
-                this._scheduleReconnect();
-            }
-        });
+        this._unsubscribe();
+        this._scheduleReconnect();
     }
 
     _scheduleReconnect() {
@@ -173,6 +172,15 @@ class BlockSubscribe extends BasicService {
     }
 
     _unsubscribe() {
+        this._connection.removeListener('connect', this._onConnectionConnect);
+        this._connection.removeListener('close', this._onConnectionClose);
+        this._connection.removeListener('error', this._onConnectionError);
+
+        this._connection.on('error', () => {
+            // Вешаем пустой обработчик ошибки на отключаемое соединение,
+            // чтобы случайные ошибки из соединения не убили приложение
+        });
+
         for (const { subscriber, handler } of Object.values(this._subscribers)) {
             subscriber.removeListener('message', handler);
 
@@ -184,6 +192,7 @@ class BlockSubscribe extends BasicService {
         }
 
         this._subscribers = {};
+        this._connection = null;
     }
 
     _subscribeAcceptBlock() {
@@ -282,6 +291,20 @@ class BlockSubscribe extends BasicService {
 
     _tryToAcceptCurrentBlock() {
         const block = this._currentBlock;
+
+        const { transactions, isAll } = this._extractTransactions();
+
+        if (!isAll) {
+            return;
+        }
+
+        this._finalizeBlock(block, transactions);
+
+        this._checkBlockQueue();
+    }
+
+    _extractTransactions() {
+        const block = this._currentBlock;
         const transactions = [];
 
         for (const trxMeta of block.trxs) {
@@ -294,7 +317,9 @@ class BlockSubscribe extends BasicService {
             // Если нет нужной транзакции, то прекращаем обработку, и при каждой
             // новой транзакции проверяем снова весь список.
             if (!trx) {
-                return;
+                return {
+                    isAll: false,
+                };
             }
 
             const stats = { ...trxMeta };
@@ -309,20 +334,18 @@ class BlockSubscribe extends BasicService {
             });
         }
 
+        return {
+            transactions,
+            isAll: true,
+        };
+    }
+
+    _finalizeBlock(block, transactions) {
         for (const { id } of transactions) {
             this._transactions.delete(id);
         }
 
-        let time = block.block_time;
-
-        // Convert invalid format
-        // "2019-06-13T19:31:13.838" (without time zone) into
-        // "2019-06-13T19:31:13.838Z"
-        if (time.length === 23) {
-            time += 'Z';
-        }
-
-        const blockTime = new Date(time);
+        const blockTime = this._parseDate(block.block_time);
 
         this._lastBlockTime = blockTime;
 
@@ -344,8 +367,6 @@ class BlockSubscribe extends BasicService {
 
         this._currentBlock = null;
         this._lastProcessedSequence = block.sequence;
-
-        this._checkBlockQueue();
     }
 
     _checkBlockQueue() {
@@ -441,6 +462,19 @@ class BlockSubscribe extends BasicService {
         for (const id of removeIds) {
             this._transactions.delete(id);
         }
+    }
+
+    _parseDate(dateString) {
+        let time = dateString;
+
+        // Convert invalid format
+        // "2019-06-13T19:31:13.838" (without time zone) into
+        // "2019-06-13T19:31:13.838Z"
+        if (time.length === 23) {
+            time += 'Z';
+        }
+
+        return new Date(time);
     }
 }
 
