@@ -230,8 +230,11 @@ class BlockSubscribe extends BasicService {
             options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA + env.GLS_HOLD_TRANSACTIONS_TIME);
         } else {
             if (this._lastBlockTime) {
-                const startTime = new Date(this._lastBlockTime);
-                startTime.setMinutes(startTime.getMinutes() - 30);
+                // Начинаем собирать транзакции для блоков с запасом по времени
+                const startTime = new Date(
+                    new Date(this._lastBlockTime).getTime() - env.GLS_TRANSACTIONS_TIME_GAP
+                );
+
                 options.setStartTime(startTime);
             } else {
                 options.setDeliverAllAvailable();
