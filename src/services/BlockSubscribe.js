@@ -444,7 +444,7 @@ class BlockSubscribe extends BasicService {
                     process.exit(1);
                 }
             }
-        }, HOLD_TRANSACTIONS_TIME);
+        }, env.GLS_WAIT_FOR_TRANSACTION_TIMEOUT);
     }
 
     _handleBlockCommit({ data: block }) {
