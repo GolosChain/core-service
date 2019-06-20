@@ -23,6 +23,8 @@ module.exports = {
     GLS_USE_ONLY_RECENT_BLOCKS:
         Boolean(env.GLS_USE_ONLY_RECENT_BLOCKS) && env.GLS_USE_ONLY_RECENT_BLOCKS !== 'false',
     GLS_LOCAL_METRICS: parseLocalMetricsEnv(),
+    GLS_ALLOW_TRANSACTION_MISS:
+        Boolean(env.GLS_ALLOW_TRANSACTION_MISS) && env.GLS_ALLOW_TRANSACTION_MISS !== 'false',
 };
 
 function parseLocalMetricsEnv() {
