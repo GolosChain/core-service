@@ -25,6 +25,8 @@ module.exports = {
     GLS_LOCAL_METRICS: parseLocalMetricsEnv(),
     GLS_ALLOW_TRANSACTION_MISS:
         Boolean(env.GLS_ALLOW_TRANSACTION_MISS) && env.GLS_ALLOW_TRANSACTION_MISS !== 'false',
+    GLS_WAIT_FOR_TRANSACTION_TIMEOUT: Number(env.GLS_WAIT_FOR_TRANSACTION_TIMEOUT) || 300000,
+    GLS_HOLD_TRANSACTIONS_TIME: Number(env.GLS_HOLD_TRANSACTIONS_TIME) || 300000,
 };
 
 function parseLocalMetricsEnv() {
