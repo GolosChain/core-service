@@ -29,7 +29,7 @@ class BlockSubscribe extends BasicService {
      *   Дата последней успешной обработки, с которого нужно начать обработку.
      * @param {boolean} [onlyIrreversible]
      *   В случае true эвенты будут возвращать только неоткатные блоки
-     * @param {boolean} [includeExpiredTransactions]
+     * @param {boolean} [includeAllTransactions]
      *   Если не нужно отбрасывать протухшие транзакции
      * @param {string} [serverName]
      *   Имя сервера для подписки, в ином случае берется из env.
@@ -42,7 +42,7 @@ class BlockSubscribe extends BasicService {
         lastSequence = 0,
         lastTime = null,
         onlyIrreversible = false,
-        includeExpiredTransactions = false,
+        includeAllTransactions = false,
         serverName = env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
         clientName = env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
         connectString = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
@@ -66,7 +66,7 @@ class BlockSubscribe extends BasicService {
 
         this._lastBlockTime = lastTime;
         this._onlyIrreversible = onlyIrreversible;
-        this._includeExpired = includeExpiredTransactions;
+        this._includeAll = includeAllTransactions;
         this._serverName = serverName;
         this._clientName = clientName;
         this._connectString = connectString;
@@ -222,7 +222,7 @@ class BlockSubscribe extends BasicService {
 
     _subscribeApplyTrx() {
         const options = this._connection.subscriptionOptions();
-        options.setMaxInFlight(1);
+        options.setMaxInFlight(5);
 
         if (this._isRecentSubscribeMode) {
             // Для транзакций ставим интервал с двухкратным запасом,
@@ -345,7 +345,7 @@ class BlockSubscribe extends BasicService {
         for (const trxMeta of block.trxs) {
             const trx = this._transactions.get(trxMeta.id);
 
-            if (!this._includeExpired && trxMeta.status === 'expired') {
+            if (trxMeta.status !== 'executed' && !this._includeAll) {
                 continue;
             }
 
