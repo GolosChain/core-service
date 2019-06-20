@@ -310,15 +310,17 @@ class BlockSubscribe extends BasicService {
             return;
         }
 
-        this._currentBlock = block;
+        this._setCurrentBlock(block);
 
         this._tryToAcceptCurrentBlock();
     }
 
-    _tryToAcceptCurrentBlock() {
+    _tryToAcceptCurrentBlock({ skipMissedTransactions = false } = {}) {
         const block = this._currentBlock;
 
-        const { transactions, isAll } = this._extractTransactions();
+        const { transactions, isAll } = this._extractTransactions({
+            skipMissedTransactions,
+        });
 
         if (!isAll) {
             return;
@@ -329,7 +331,7 @@ class BlockSubscribe extends BasicService {
         this._checkBlockQueue();
     }
 
-    _extractTransactions() {
+    _extractTransactions({ skipMissedTransactions }) {
         const block = this._currentBlock;
         const transactions = [];
 
@@ -342,7 +344,7 @@ class BlockSubscribe extends BasicService {
 
             // Если нет нужной транзакции, то прекращаем обработку, и при каждой
             // новой транзакции проверяем снова весь список.
-            if (!trx) {
+            if (!trx && !skipMissedTransactions) {
                 return {
                     isAll: false,
                 };
@@ -417,7 +419,18 @@ class BlockSubscribe extends BasicService {
                         block.block_num
                     }`
                 );
-                process.exit(1);
+
+                for (const { id } of block.trxs) {
+                    if (!this._transactions.has(id)) {
+                        Logger.error(`Missed transaction: ${id}`);
+                    }
+                }
+
+                if (env.GLS_ALLOW_TRANSACTION_MISS) {
+                    this._tryToAcceptCurrentBlock({ skipMissedTransactions: true });
+                } else {
+                    process.exit(1);
+                }
             }
         }, HOLD_TRANSACTIONS_TIME);
     }
