@@ -58,11 +58,13 @@ class BlockSubscribe extends BasicService {
 
         if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
             this._lastProcessedSequence = null;
+            this._ignoreSequencesLess = (lastSequence || 0) + 1;
             this._isRecentSubscribeMode = true;
         } else {
             this._lastProcessedSequence = lastSequence || 0;
             this._isRecentSubscribeMode = false;
         }
+
         this._lastBlockTime = lastTime;
         this._onlyIrreversible = onlyIrreversible;
         this._includeExpired = includeExpiredTransactions;
@@ -285,8 +287,14 @@ class BlockSubscribe extends BasicService {
     }
 
     _handleBlockAccept({ data: block, sequence }) {
-        if (env.GLS_USE_ONLY_RECENT_BLOCKS && this._lastProcessedSequence === null) {
-            this._lastProcessedSequence = sequence - 1;
+        if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
+            if (sequence < this._ignoreSequencesLess) {
+                return;
+            }
+
+            if (this._lastProcessedSequence === null) {
+                this._lastProcessedSequence = sequence - 1;
+            }
         }
 
         if (sequence <= this._lastProcessedSequence) {
