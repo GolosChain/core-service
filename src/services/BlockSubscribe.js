@@ -344,7 +344,11 @@ class BlockSubscribe extends BasicService {
 
             // Если нет нужной транзакции, то прекращаем обработку, и при каждой
             // новой транзакции проверяем снова весь список.
-            if (!trx && !skipMissedTransactions) {
+            if (!trx) {
+                if (skipMissedTransactions) {
+                    continue;
+                }
+
                 return {
                     isAll: false,
                 };
