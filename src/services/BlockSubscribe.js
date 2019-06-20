@@ -5,7 +5,6 @@ const Logger = require('../utils/Logger');
 const ParallelUtils = require('../utils/Parallel');
 const metrics = require('../utils/metrics');
 
-const HOLD_TRANSACTIONS_TIME = 5 * 60 * 1000;
 const RECENT_BLOCKS_TIME_DELTA = 10 * 60 * 1000;
 
 // TODO Fork management
@@ -228,7 +227,7 @@ class BlockSubscribe extends BasicService {
         if (this._isRecentSubscribeMode) {
             // Для транзакций ставим интервал с двухкратным запасом,
             // чтобы скачались все транзакции нужные для первого блока
-            options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA + HOLD_TRANSACTIONS_TIME);
+            options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA + env.GLS_HOLD_TRANSACTIONS_TIME);
         } else {
             if (this._lastBlockTime) {
                 const startTime = new Date(this._lastBlockTime);
@@ -503,7 +502,7 @@ class BlockSubscribe extends BasicService {
     _startCleaners() {
         setInterval(() => {
             this._removeOldTransactions();
-        }, HOLD_TRANSACTIONS_TIME);
+        }, env.GLS_HOLD_TRANSACTIONS_TIME);
     }
 
     _removeOldTransactions() {
