@@ -203,6 +203,7 @@ class BlockSubscribe extends BasicService {
 
     _subscribeAcceptBlock() {
         const options = this._connection.subscriptionOptions();
+        options.setMaxInFlight(1);
 
         if (this._isRecentSubscribeMode) {
             options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA);
@@ -220,6 +221,7 @@ class BlockSubscribe extends BasicService {
 
     _subscribeApplyTrx() {
         const options = this._connection.subscriptionOptions();
+        options.setMaxInFlight(1);
 
         if (this._isRecentSubscribeMode) {
             // Для транзакций ставим интервал с двухкратным запасом,
@@ -244,12 +246,13 @@ class BlockSubscribe extends BasicService {
     }
 
     _subscribeCommitBlock() {
-        const commitOptions = this._connection.subscriptionOptions();
-        commitOptions.setStartWithLastReceived();
+        const options = this._connection.subscriptionOptions();
+        options.setMaxInFlight(1);
+        options.setStartWithLastReceived();
 
         this._subscribeOnEvents(
             'CommitBlock',
-            commitOptions,
+            options,
             'core_block_commit',
             this._handleBlockCommit
         );
