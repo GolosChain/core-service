@@ -222,7 +222,7 @@ class BlockSubscribe extends BasicService {
 
     _subscribeApplyTrx() {
         const options = this._connection.subscriptionOptions();
-        options.setMaxInFlight(5);
+        options.setMaxInFlight(env.GLS_MAX_IN_FLIGHT_TRANSACTIONS);
 
         if (this._isRecentSubscribeMode) {
             // Для транзакций ставим интервал с двухкратным запасом,
