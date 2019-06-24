@@ -1,4 +1,5 @@
 const fs = require('fs');
+const env = require('../data/env');
 
 class LocalMetrics {
     constructor({ type = 'log', interval = null } = {}) {
@@ -12,8 +13,12 @@ class LocalMetrics {
                 this._print();
             }, this._interval).unref();
         } else if (type === 'file') {
-            // Remove old stats.txt
-            fs.unlink('stats.txt', () => {});
+            if (env.GLS_PRESERVE_LOCAL_METRICS) {
+                fs.rename('stats.txt', `stats-${Date.now()}.txt`, () => {});
+            } else {
+                fs.unlink('stats.txt', () => {});
+            }
+
             this._interval = interval || 2000;
             setInterval(() => {
                 this._write();
