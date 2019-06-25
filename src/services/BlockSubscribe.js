@@ -315,7 +315,7 @@ class BlockSubscribe extends BasicService {
 
         block.sequence = sequence;
 
-        if (this._lastProcessedSequence && this._lastProcessedSequence + 1 !== sequence) {
+        if (this._lastProcessedSequence !== null && this._lastProcessedSequence + 1 !== sequence) {
             this._acceptedBlocksQueue.set(sequence, block);
             return;
         }
