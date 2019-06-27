@@ -55,6 +55,11 @@ class ParallelPool {
         return Promise.all(list.map(arg => this.queue(arg)));
     }
 
+    /**
+     * Получить длину очереди исполнения, включая
+     * те функции что уже запущены, но ещё не завершились
+     * @return {number} Число функций.
+     */
     getQueueLength() {
         return this._currentPromises.size + this._queue.length;
     }
