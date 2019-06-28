@@ -79,6 +79,7 @@ class BlockSubscribe extends BasicService {
         this._currentBlock = null;
         this._subscribers = {};
         this._lastEmittedBlockNum = null;
+        this._isSeqLogged = false;
 
         this._parallelUtils = new ParallelUtils();
     }
@@ -200,6 +201,7 @@ class BlockSubscribe extends BasicService {
 
         this._subscribers = {};
         this._connection = null;
+        this._isSeqLogged = false;
     }
 
     _subscribeAcceptBlock() {
@@ -209,6 +211,7 @@ class BlockSubscribe extends BasicService {
         if (this._isRecentSubscribeMode) {
             options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA);
         } else {
+            Logger.log(`Subscribe on blocks, seq: ${this._lastProcessedSequence + 1}`);
             options.setStartAtSequence(this._lastProcessedSequence + 1);
         }
 
@@ -289,6 +292,11 @@ class BlockSubscribe extends BasicService {
     }
 
     _handleBlockAccept({ data: block, sequence }) {
+        if (!this._isSeqLogged) {
+            Logger.log(`Block has came, seq: ${sequence}`);
+            this._isSeqLogged = true;
+        }
+
         if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
             if (sequence < this._ignoreSequencesLess) {
                 return;
