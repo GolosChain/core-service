@@ -1,5 +1,5 @@
 const fs = require('fs');
-const Logger = require('./Logger');
+const env = require('../data/env');
 
 class LocalMetrics {
     constructor({ type = 'log', interval = null } = {}) {
@@ -13,8 +13,12 @@ class LocalMetrics {
                 this._print();
             }, this._interval).unref();
         } else if (type === 'file') {
-            // Remove old stats.txt
-            fs.unlink('stats.txt', () => {});
+            if (env.GLS_PRESERVE_LOCAL_METRICS) {
+                fs.rename('stats.txt', `stats-${Date.now()}.txt`, () => {});
+            } else {
+                fs.unlink('stats.txt', () => {});
+            }
+
             this._interval = interval || 2000;
             setInterval(() => {
                 this._write();
@@ -30,8 +34,16 @@ class LocalMetrics {
      * @param {number} [count=1]
      */
     inc(metricName, count = 1) {
+        let increment;
+
+        if (typeof count === 'number') {
+            increment = count;
+        } else {
+            increment = 1;
+        }
+
         const value = this._values.get(metricName) || 0;
-        this._values.set(metricName, value + count);
+        this._values.set(metricName, value + increment);
     }
 
     /**
@@ -106,6 +118,9 @@ class LocalMetrics {
             return;
         }
 
+        // Импортируем в момент использования, чтобы избежать циклической зависимости
+        const Logger = require('./Logger');
+
         Logger.info(`== Stats, diff by ${this._interval}ms ==`);
 
         for (const line of lines) {
@@ -121,15 +136,14 @@ class LocalMetrics {
         }
 
         fs.writeFile(
-            '.stats.txt',
+            'stats.txt',
             `Stats by ${new Date().toJSON()}, diff by ${this._interval}ms\n\n${lines.join('\n')}\n`,
             err => {
                 if (err) {
-                    Logger.error('Stats logging failed:', err);
-                    return;
+                    // Импортируем в момент использования, чтобы избежать циклической зависимости
+                    const Logger = require('./Logger');
+                    Logger.error(err);
                 }
-
-                fs.rename('.stats.txt', 'stats.txt', () => {});
             }
         );
     }

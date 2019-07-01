@@ -56,6 +56,15 @@ class ParallelPool {
     }
 
     /**
+     * Получить длину очереди исполнения, включая
+     * те функции что уже запущены, но ещё не завершились
+     * @return {number} Число функций.
+     */
+    getQueueLength() {
+        return this._currentPromises.size + this._queue.length;
+    }
+
+    /**
      * Дождаться завершения всех вызовов (текущих и в очереди)
      */
     async flush() {

@@ -599,7 +599,7 @@ class Connector extends BasicService {
             URIError,
         ]) {
             if (error instanceof InternalErrorType) {
-                Logger.error(`Internal route error: ${error.stack}`);
+                Logger.error('Internal route error:', error);
                 process.exit(1);
             }
         }
