@@ -1,6 +1,6 @@
 {
   "name": "gls-core-service",
-  "version": "3.37.1",
+  "version": "3.38.0",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -23,10 +23,10 @@
     "jayson": "^2.1.2",
     "lodash.template": "^4.4.0",
     "moment": "^2.24.0",
-    "mongoose": "^5.6.1",
+    "mongoose": "^5.6.2",
     "node-fetch": "^2.6.0",
     "node-nats-streaming": "^0.2.2",
-    "prom-client": "^11.5.2",
+    "prom-client": "^11.5.3",
     "random": "^2.1.1",
     "sanitize-html": "^1.20.1",
     "text-encoding": "^0.7.0",

@@ -57,9 +57,7 @@ class BlockSubscribe extends BasicService {
         this._clientName = clientName;
         this._connectString = connectString;
 
-        this._transactions = new Map();
-        this._recentTransactions = new Set();
-        this._oldTransactions = new Set();
+        this._blockNumTransactions = new Map();
         this._acceptedBlocksQueue = new Map();
         this._completeBlocksQueue = [];
         this._currentBlock = null;
@@ -93,7 +91,6 @@ class BlockSubscribe extends BasicService {
         await this._initMetadata();
         await this._extractMetaData();
         this._connectToMessageBroker();
-        this._startCleaners();
     }
 
     /**
@@ -309,7 +306,7 @@ class BlockSubscribe extends BasicService {
         if (this._isRecentSubscribeMode) {
             // Для транзакций ставим интервал с двухкратным запасом,
             // чтобы скачались все транзакции нужные для первого блока
-            options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA + env.GLS_HOLD_TRANSACTIONS_TIME);
+            options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA);
         } else {
             if (this._lastBlockTime) {
                 // Начинаем собирать транзакции для блоков с запасом по времени
@@ -362,8 +359,18 @@ class BlockSubscribe extends BasicService {
     }
 
     _handleTransactionApply({ data: transaction }) {
-        this._recentTransactions.add(transaction.id);
-        this._transactions.set(transaction.id, transaction);
+        if (this._lastBlockNum && this._lastBlockNum >= transaction.block_num) {
+            return;
+        }
+
+        let transactions = this._blockNumTransactions.get(transaction.block_num);
+
+        if (!transactions) {
+            transactions = new Map();
+            this._blockNumTransactions.set(transaction.block_num, transactions);
+        }
+
+        transactions.set(transaction.id, transaction);
 
         if (this._currentBlock) {
             this._tryToAcceptCurrentBlock();
@@ -428,11 +435,12 @@ class BlockSubscribe extends BasicService {
         const transactions = [];
 
         for (const trxMeta of block.trxs) {
-            const trx = this._transactions.get(trxMeta.id);
-
             if (trxMeta.status !== 'executed' && !this._includeAll) {
                 continue;
             }
+
+            const blockNumTransactions = this._blockNumTransactions.get(block.block_num);
+            const trx = blockNumTransactions ? blockNumTransactions.get(trxMeta.id) : null;
 
             // Если нет нужной транзакции, то прекращаем обработку, и при каждой
             // новой транзакции проверяем снова весь список.
@@ -465,12 +473,9 @@ class BlockSubscribe extends BasicService {
     }
 
     _finalizeBlock(block, transactions) {
-        for (const { id } of transactions) {
-            this._transactions.delete(id);
-        }
-
         const blockTime = this._parseDate(block.block_time);
 
+        this._lastBlockNum = block.block_num;
         this._lastBlockTime = blockTime;
 
         const blockData = {
@@ -492,6 +497,8 @@ class BlockSubscribe extends BasicService {
         this._isRecentSubscribeMode = false;
         this._currentBlock = null;
         this._lastProcessedSequence = block.sequence;
+
+        this._cleanOldTransactions(block.block_num);
     }
 
     _checkBlockQueue() {
@@ -517,7 +524,7 @@ class BlockSubscribe extends BasicService {
                 );
 
                 for (const { id } of block.trxs) {
-                    if (!this._transactions.has(id)) {
+                    if (!this._blockNumTransactions.has(id)) {
                         Logger.error(`Missed transaction: ${id}`);
                     }
                 }
@@ -592,19 +599,11 @@ class BlockSubscribe extends BasicService {
         }
     }
 
-    _startCleaners() {
-        setInterval(() => {
-            this._removeOldTransactions();
-        }, env.GLS_HOLD_TRANSACTIONS_TIME);
-    }
-
-    _removeOldTransactions() {
-        const removeIds = this._oldTransactions;
-        this._oldTransactions = this._recentTransactions;
-        this._recentTransactions = new Set();
-
-        for (const id of removeIds) {
-            this._transactions.delete(id);
+    _cleanOldTransactions(lastProcessedBlockNum) {
+        for (const blockNum of this._blockNumTransactions.keys()) {
+            if (blockNum <= lastProcessedBlockNum) {
+                this._blockNumTransactions.delete(blockNum);
+            }
         }
     }
 
