@@ -1,5 +1,4 @@
 const Basic = require('./Basic');
-const ServiceMeta = require('../utils/ServiceMeta');
 const MongoDB = require('../services/MongoDB');
 const Logger = require('../utils/Logger');
 const metrics = require('../utils/metrics');
@@ -51,13 +50,10 @@ class BasicMain extends Basic {
     }
 
     /**
-     * Метод установки метаданных микросервиса.
-     * @param {Object} meta Любые необходимые данные (см. utils/ServiceMeta).
+     * @deprecated
      */
-    defineMeta(meta) {
-        for (const key of Object.keys(meta)) {
-            ServiceMeta.set(key, meta[key]);
-        }
+    defineMeta() {
+        Logger.warn('Define meta is deprecated')
     }
 
     /**

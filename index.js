@@ -11,7 +11,6 @@ const UtilsLogger = require('./src/utils/Logger');
 const UtilsMoments = require('./src/utils/Moments');
 const UtilsTemplate = require('./src/utils/Template');
 const UtilsRpcObject = require('./src/utils/RpcObject');
-const UtilsServiceMeta = require('./src/utils/ServiceMeta');
 const UtilsContent = require('./src/utils/Content');
 const utilsDefaultStarter = require('./src/utils/defaultStarter');
 const UtilsGateClient = require('./src/utils/GateClient');
@@ -42,7 +41,6 @@ module.exports = {
         Moments: UtilsMoments,
         Template: UtilsTemplate,
         RpcObject: UtilsRpcObject,
-        ServiceMeta: UtilsServiceMeta,
         Parallel: UtilsParallel,
         ParallelPool: UtilsParallelPool,
         Content: UtilsContent,
