@@ -22,9 +22,26 @@ const RECENT_BLOCKS_TIME_DELTA = 10 * 60 * 1000;
  */
 class BlockSubscribe extends BasicService {
     /**
+     * Структура блока.
+     * @typedef Block
+     * @property {string} id Идентификатор блока.
+     * @property {number} blockNum Номер блока.
+     * @property {Date} blockTime Время блока.
+     * @property {Array<Object>} transactions Транзакции в оригинальном виде.
+     */
+
+    /**
+     * Оповещает о текущем номере неоткатного блока.
+     * @event irreversibleBlockNum
+     * @property {number} irreversibleBlockNum Номер неоткатного блока.
+     */
+
+    /**
      * В случае если очередь блокчейн-ноды уже не хранит необходимые
      * блоки будет выведено предупреждение.
      * TODO: Если нужные сообщения в nats уже исчезли надо что-то делать!
+     * @param {Function} blockHandler
+     *   Обработчик новых блоков, вызывается с await
      * @param {boolean} [onlyIrreversible]
      *   В случае true эвенты будут возвращать только неоткатные блоки
      * @param {boolean} [includeAllTransactions]
@@ -42,6 +59,7 @@ class BlockSubscribe extends BasicService {
         serverName = env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
         clientName = env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
         connectString = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
+        blockHandler,
     } = {}) {
         super();
 
@@ -65,24 +83,12 @@ class BlockSubscribe extends BasicService {
         this._lastEmittedBlockNum = null;
 
         this._parallelUtils = new ParallelUtils();
+
+        this._blockHandler = this._parallelUtils.consequentially(async block => {
+            await this._setLastBlock(block);
+            await blockHandler(block);
+        });
     }
-
-    /**
-     * Вызывается в случае получения нового блока из блокчейна.
-     * Не гарантирует точную последовательность.
-     * @event block
-     * @property {Object} block Блок из блокчейна.
-     * @property {string} block.id Идентификатор блока.
-     * @property {number} block.blockNum Номер блока.
-     * @property {Date} block.blockTime Время блока.
-     * @property {Array<Object>} block.transactions Транзакции в оригинальном виде.
-     */
-
-    /**
-     * Оповещает о текущем номере неоткатного блока.
-     * @event irreversibleBlockNum
-     * @property {number} irreversibleBlockNum Номер неоткатного блока.
-     */
 
     /**
      * Запуск сервиса.
@@ -91,22 +97,6 @@ class BlockSubscribe extends BasicService {
         await this._initMetadata();
         await this._extractMetaData();
         this._connectToMessageBroker();
-    }
-
-    /**
-     * Вызовет переданную функцию на каждый блок, полученный из блокчейна,
-     * при этом дождавшись её выполнения используя await.
-     * Аргументы для функции аналогичны эвенту block.
-     * @param {function} callback Обработчик.
-     */
-    eachBlock(callback) {
-        this.on(
-            'block',
-            this._parallelUtils.consequentially(async block => {
-                await this._setLastBlock(block);
-                await callback(block);
-            })
-        );
     }
 
     /**
@@ -582,6 +572,8 @@ class BlockSubscribe extends BasicService {
         }
 
         metrics.inc('core_block_received');
+
+        this._blockHandler(block);
     }
 
     _parseMessageData(message) {
