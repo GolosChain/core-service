@@ -1,7 +1,4 @@
-const { JsonRpc, Api } = require('cyberwayjs');
-const JsSignatureProvider = require('cyberwayjs/dist/eosjs-jssig').default;
-const fetch = require('node-fetch');
-const { TextEncoder, TextDecoder } = require('text-encoding');
+const CyberWayClient = require('./CyberWayClient');
 
 /**
  * Класс, реализующий регистрацию пользователя в БЧ
@@ -11,42 +8,27 @@ const { TextEncoder, TextDecoder } = require('text-encoding');
 class UserRegistration {
     /**
      * Конструктор, инициализирующий требуемую настройку для общения с БЧ
-     * @param {string} blockChainConnectionString http-ендпоинт для подключения к БЧ
      * @param {string} registrarKey приватный ключ пользователя, осущетвляющего регистрацию (регистратора)
      * @param {string} creatorKey приватный ключ пользователя, осущетвляющего создание юзернейма (создателя)
      * @param {string} registrarAccount имя аккаунта-регистратора
      * @param {string} creatorAccount имя аккаунта-создателя
      */
-    constructor({
-        blockChainConnectionString,
-        registrarKey,
-        creatorKey,
-        registrarAccount,
-        creatorAccount,
-    }) {
+    constructor({ registrarKey, creatorKey, registrarAccount, creatorAccount }) {
         this._validateInput({
-            blockChainConnectionString,
             registrarKey,
             creatorKey,
             registrarAccount,
             creatorAccount,
         });
 
-        this._blockChainConnectionString = blockChainConnectionString;
         this._registrarKey = registrarKey;
         this._creatorKey = creatorKey;
         this._registrarAccount = registrarAccount;
         this._creatorAccount = creatorAccount;
 
-        const rpc = new JsonRpc(this._blockChainConnectionString, { fetch });
-        const signatureProvider = new JsSignatureProvider([this._registrarKey, this._creatorKey]);
+        const cyberWayClient = new CyberWayClient([this._registrarKey, this._creatorKey]);
 
-        this._api = new Api({
-            rpc,
-            signatureProvider,
-            textDecoder: new TextDecoder(),
-            textEncoder: new TextEncoder(),
-        });
+        this._api = cyberWayClient.getClient();
     }
 
     /**
@@ -58,17 +40,7 @@ class UserRegistration {
      * @param {string} creatorAccount имя аккаунта-создателя
      * @throws {Error} Ошибка валидации
      */
-    _validateInput({
-        blockChainConnectionString,
-        registrarKey,
-        creatorKey,
-        registrarAccount,
-        creatorAccount,
-    }) {
-        if (!blockChainConnectionString) {
-            throw new Error('Property "blockChainConnectionString" is required');
-        }
-
+    _validateInput({ registrarKey, creatorKey, registrarAccount, creatorAccount }) {
         if (!registrarKey) {
             throw new Error('Property "registrarKey" is required');
         }
