@@ -4,29 +4,27 @@ const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const ParallelUtils = require('../utils/Parallel');
 const metrics = require('../utils/metrics');
+const Model = require('../models/BlockSubscribe');
 
 const RECENT_BLOCKS_TIME_DELTA = 10 * 60 * 1000;
 
-// TODO Fork management
 /**
  * Сервис подписки получения новых блоков.
  * Подписывается на рассылку блоков от CyberWay-ноды.
  * Каждый полученный блок сериализуется и передается
- * в эвенте 'block', а в случае форка вызывается эвент 'fork'.
- * Для работы с генезис-блоком предоставлен специальный
- * эвент 'genesisData'.
+ * в колбек метода eachBlock, также этот метод гарантирует
+ * последовательное поступление блоков, а колбек вызвается
+ * через await.
  *
- * Текущая версия не поддерживает 'fork'!
+ * Предполагается что MongoDB была инициализирована и в неё
+ * можно что-то записать и из неё что-то прочитать,
+ * утилита хранит в базе свои метаданные.
  */
 class BlockSubscribe extends BasicService {
     /**
      * В случае если очередь блокчейн-ноды уже не хранит необходимые
      * блоки будет выведено предупреждение.
      * TODO: Если нужные сообщения в nats уже исчезли надо что-то делать!
-     * @param {number} lastSequence
-     *   Номер сообщения в nats, с которого нужно начать обработку.
-     * @param {Date|string} lastTime
-     *   Дата последней успешной обработки, с которого нужно начать обработку.
      * @param {boolean} [onlyIrreversible]
      *   В случае true эвенты будут возвращать только неоткатные блоки
      * @param {boolean} [includeAllTransactions]
@@ -39,8 +37,6 @@ class BlockSubscribe extends BasicService {
      *   Строка подключения (с авторизацией), в ином случае берется из env.
      */
     constructor({
-        lastSequence = 0,
-        lastTime = null,
         onlyIrreversible = false,
         includeAllTransactions = false,
         serverName = env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
@@ -55,16 +51,6 @@ class BlockSubscribe extends BasicService {
         this._onConnectionClose = this._onConnectionClose.bind(this);
         this._onConnectionError = this._onConnectionError.bind(this);
 
-        if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
-            this._lastProcessedSequence = null;
-            this._ignoreSequencesLess = (lastSequence || 0) + 1;
-            this._isRecentSubscribeMode = true;
-        } else {
-            this._lastProcessedSequence = lastSequence || 0;
-            this._isRecentSubscribeMode = false;
-        }
-
-        this._lastBlockTime = lastTime;
         this._onlyIrreversible = onlyIrreversible;
         this._includeAll = includeAllTransactions;
         this._serverName = serverName;
@@ -85,21 +71,13 @@ class BlockSubscribe extends BasicService {
 
     /**
      * Вызывается в случае получения нового блока из блокчейна.
+     * Не гарантирует точную последовательность.
      * @event block
      * @property {Object} block Блок из блокчейна.
      * @property {string} block.id Идентификатор блока.
      * @property {number} block.blockNum Номер блока.
      * @property {Date} block.blockTime Время блока.
      * @property {Array<Object>} block.transactions Транзакции в оригинальном виде.
-     */
-
-    /**
-     * Не работает в текущей версии!
-     *
-     * Вызывается в случае обнаружения форка, оповещает о номере блока,
-     * с которого начинаются расхождения.
-     * После этого эвента подписчик прекращает свою работу.
-     * @event fork
      */
 
     /**
@@ -110,9 +88,10 @@ class BlockSubscribe extends BasicService {
 
     /**
      * Запуск сервиса.
-     * @async
      */
     async start() {
+        await this._initMetadata();
+        await this._extractMetaData();
         this._connectToMessageBroker();
         this._startCleaners();
     }
@@ -125,6 +104,109 @@ class BlockSubscribe extends BasicService {
      */
     eachBlock(callback) {
         this.on('block', this._parallelUtils.consequentially(callback));
+    }
+
+    /**
+     * Получить мета-данные последнего блока.
+     * @return {{lastBlockSequence: number, lastBlockNum: number, lastBlockTime: Date/null}}
+     * Номер блока в очереди транслятора, номер блока в блокчейне, дата блока в блокчейне.
+     */
+    async getLastBlockMetaData() {
+        const model = await Model.findOne(
+            {},
+            {
+                lastBlockNum: true,
+                lastBlockSequence: true,
+                lastBlockTime: true,
+            },
+            {
+                lean: true,
+            }
+        );
+
+        if (!model) {
+            return {
+                lastBlockNum: 0,
+                lastBlockSequence: 0,
+                lastBlockTime: null,
+            };
+        }
+
+        return {
+            lastBlockNum: model.lastBlockNum,
+            lastBlockSequence: model.lastBlockSequence,
+            lastBlockTime: model.lastBlockTime,
+        };
+    }
+
+    /**
+     * Форсированная установка мета-данных последнего блока,
+     * например актуально в случае возникновения форка.
+     * @param {number} lastBlockNum Номер блока в блокчейне.
+     * @param {Date/null} lastBlockTime Дата блока в блокчейне
+     * @param {number} lastBlockSequence Номер блока в очереди транслятора.
+     */
+    async setLastBlockMetaData({ lastBlockNum, lastBlockTime, lastBlockSequence }) {
+        const update = {};
+
+        if (lastBlockNum !== undefined) {
+            update.lastBlockNum = lastBlockNum;
+        }
+
+        if (lastBlockTime !== undefined) {
+            update.lastBlockTime = lastBlockTime;
+        }
+
+        if (lastBlockSequence !== undefined) {
+            update.lastBlockSequence = lastBlockSequence;
+        }
+
+        if (!Object.keys(update).length) {
+            Logger.warn('Last block update - empty params');
+            return;
+        }
+
+        await Model.updateOne({}, { $set: update });
+    }
+
+    async _initMetadata() {
+        if ((await Model.countDocuments()) === 0) {
+            const model = new Model();
+
+            await model.save();
+        }
+    }
+
+    async _extractMetaData() {
+        let lastBlockSequence = 0;
+        let lastBlockTime = null;
+
+        const model = await Model.findOne(
+            {},
+            {
+                lastBlockSequence: true,
+                lastBlockTime: true,
+            },
+            {
+                lean: true,
+            }
+        );
+
+        if (model) {
+            lastBlockSequence = model.lastBlockSequence;
+            lastBlockTime = model.lastBlockTime;
+        }
+
+        if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
+            this._lastProcessedSequence = null;
+            this._ignoreSequencesLess = lastBlockSequence + 1;
+            this._isRecentSubscribeMode = true;
+        } else {
+            this._lastProcessedSequence = lastBlockSequence;
+            this._isRecentSubscribeMode = false;
+        }
+
+        this._lastBlockTime = lastBlockTime;
     }
 
     _connectToMessageBroker() {
@@ -487,7 +569,15 @@ class BlockSubscribe extends BasicService {
         }
 
         metrics.inc('core_block_received');
-        this.emit('block', block);
+
+        this._setLastBlock(block).then(
+            () => {
+                this.emit('block', block);
+            },
+            error => {
+                throw error;
+            }
+        );
     }
 
     _parseMessageData(message) {
@@ -529,6 +619,19 @@ class BlockSubscribe extends BasicService {
         }
 
         return new Date(time);
+    }
+
+    async _setLastBlock(block) {
+        await Model.updateOne(
+            {},
+            {
+                $set: {
+                    lastBlockNum: block.blockNum,
+                    lastBlockTime: block.blockTime,
+                    lastBlockSequence: block.sequence,
+                },
+            }
+        );
     }
 }
 
