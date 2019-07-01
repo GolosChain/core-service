@@ -40,7 +40,8 @@ class BlockSubscribe extends BasicService {
      * В случае если очередь блокчейн-ноды уже не хранит необходимые
      * блоки будет выведено предупреждение.
      * TODO: Если нужные сообщения в nats уже исчезли надо что-то делать!
-     * @param {Function} blockHandler - обработчик новых блоков, вызывается с await
+     * @param {Function} blockHandler
+     *   Обработчик новых блоков, вызывается с await
      * @param {boolean} [onlyIrreversible]
      *   В случае true эвенты будут возвращать только неоткатные блоки
      * @param {boolean} [includeAllTransactions]
