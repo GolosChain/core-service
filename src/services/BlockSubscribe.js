@@ -79,7 +79,7 @@ class BlockSubscribe extends BasicService {
      */
 
     /**
-     * Оповещает об текущем номере неоткатного блока.
+     * Оповещает о текущем номере неоткатного блока.
      * @event irreversibleBlockNum
      * @property {number} irreversibleBlockNum Номер неоткатного блока.
      */
@@ -100,7 +100,13 @@ class BlockSubscribe extends BasicService {
      * @param {function} callback Обработчик.
      */
     eachBlock(callback) {
-        this.on('block', this._parallelUtils.consequentially(callback));
+        this.on(
+            'block',
+            this._parallelUtils.consequentially(async block => {
+                await this._setLastBlock(block);
+                await callback(block);
+            })
+        );
     }
 
     /**
@@ -576,15 +582,6 @@ class BlockSubscribe extends BasicService {
         }
 
         metrics.inc('core_block_received');
-
-        this._setLastBlock(block).then(
-            () => {
-                this.emit('block', block);
-            },
-            error => {
-                throw error;
-            }
-        );
     }
 
     _parseMessageData(message) {
