@@ -19,6 +19,8 @@ const UtilsUserRegister = require('./src/utils/UserRegister');
 const utilsMetrics = require('./src/utils/metrics');
 const UtilsParallelPool = require('./src/utils/ParallelPool');
 const utilsWaitForTransaction = require('./src/utils/waitForTransaction');
+const UtilsCyberWayClient = require('./src/utils/CyberWayClient');
+
 const TypesBigNum = require('./src/types/BigNum');
 const TypesMongoBigNum = require('./src/types/MongoBigNum');
 
@@ -49,6 +51,7 @@ module.exports = {
         metrics: utilsMetrics,
         UserRegister: UtilsUserRegister,
         waitForTransaction: utilsWaitForTransaction,
+        CyberWayClient: UtilsCyberWayClient,
     },
     types: {
         BigNum: TypesBigNum,
