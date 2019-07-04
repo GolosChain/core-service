@@ -300,9 +300,9 @@ class BlockSubscribe extends BasicService {
         options.setMaxInFlight(env.GLS_MAX_IN_FLIGHT_TRANSACTIONS);
 
         if (this._isRecentSubscribeMode) {
-            // Для транзакций ставим интервал с двухкратным запасом,
+            // Для транзакций ставим интервал с запасом,
             // чтобы скачались все транзакции нужные для первого блока
-            options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA);
+            options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA + env.GLS_TRANSACTIONS_TIME_GAP);
         } else {
             if (this._lastBlockTime) {
                 // Начинаем собирать транзакции для блоков с запасом по времени
