@@ -48,6 +48,7 @@ class Basic {
             return await this.connector.sendTo(...args);
         } else {
             Logger.error('Basic controller - connector not defined');
+            console.trace();
             throw 'Connector not defined';
         }
     }
@@ -66,6 +67,7 @@ class Basic {
             return await this.connector.callService(service, method, params);
         } else {
             Logger.error('Basic controller - connector not defined');
+            console.trace();
             throw 'Connector not defined';
         }
     }
