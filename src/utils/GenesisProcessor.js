@@ -56,6 +56,11 @@ class GenesisProcessor {
         metrics.set('genesis_controller_queue_length', controllerQueueLength);
 
         if (this._isPaused) {
+            // Делители 4 и 10 используются для того чтобы убрать частые переходы между состояниями активности и паузы.
+            // Суть такая, что если убрать эти делители, то при колебаниях показателей около границ будут происходить
+            // частые остановки и восстановления, так как показатели handleQueueLength и controllerQueueLength часто
+            // меняются. При использовании делителей, подписка будет восстановлена только при существенном уменьшении
+            // очередей. Показатели 4 и 10 были выбраны имперически.
             if (
                 handleQueueLength < MAX_HANDLE_QUEUE_LENGTH / 4 &&
                 controllerQueueLength < MAX_CONTROLLER_QUEUE_LENGTH / 10
