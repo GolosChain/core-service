@@ -6,8 +6,6 @@ const ParallelUtils = require('../utils/Parallel');
 const metrics = require('../utils/metrics');
 const Model = require('../models/BlockSubscribe');
 
-const RECENT_BLOCKS_TIME_DELTA = 10 * 60 * 1000;
-
 /**
  * Сервис подписки получения новых блоков.
  * Подписывается на рассылку блоков от CyberWay-ноды.
@@ -282,7 +280,7 @@ class BlockSubscribe extends BasicService {
         options.setMaxInFlight(1);
 
         if (this._isRecentSubscribeMode) {
-            options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA);
+            options.setStartAtTimeDelta(env.GLS_RECENT_BLOCKS_TIME_DELTA);
         } else {
             options.setStartAtSequence(this._lastProcessedSequence + 1);
         }
@@ -302,7 +300,9 @@ class BlockSubscribe extends BasicService {
         if (this._isRecentSubscribeMode) {
             // Для транзакций ставим интервал с запасом,
             // чтобы скачались все транзакции нужные для первого блока
-            options.setStartAtTimeDelta(RECENT_BLOCKS_TIME_DELTA + env.GLS_TRANSACTIONS_TIME_GAP);
+            options.setStartAtTimeDelta(
+                env.GLS_RECENT_BLOCKS_TIME_DELTA + env.GLS_TRANSACTIONS_TIME_GAP
+            );
         } else {
             if (this._lastBlockTime) {
                 // Начинаем собирать транзакции для блоков с запасом по времени
