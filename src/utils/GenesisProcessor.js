@@ -306,9 +306,9 @@ class GenesisProcessor {
     }
 
     async _handleEvent(type, data) {
-        if (this._previousReceivedType !== type) {
+        if (env.GLS_SAVE_GENESIS_EXAMPLES && this._previousReceivedType !== type) {
             fs.writeFile(
-                `genesis_data_type_example_${type}.json`,
+                `genesis_data_example_${type}.json`,
                 JSON.stringify(data, null, 2),
                 () => {}
             );
