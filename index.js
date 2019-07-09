@@ -16,6 +16,7 @@ const utilsDefaultStarter = require('./src/utils/defaultStarter');
 const UtilsGateClient = require('./src/utils/GateClient');
 const UtilsGenesisProcessor = require('./src/utils/GenesisProcessor');
 const UtilsParallel = require('./src/utils/Parallel');
+const UtilsBulkSaver = require('./src/utils/BulkSaver');
 const UtilsUserRegister = require('./src/utils/UserRegister');
 const utilsMetrics = require('./src/utils/metrics');
 const UtilsParallelPool = require('./src/utils/ParallelPool');
@@ -46,6 +47,7 @@ module.exports = {
         RpcObject: UtilsRpcObject,
         Parallel: UtilsParallel,
         ParallelPool: UtilsParallelPool,
+        BulkSaver: UtilsBulkSaver,
         Content: UtilsContent,
         defaultStarter: utilsDefaultStarter,
         GateClient: UtilsGateClient,
