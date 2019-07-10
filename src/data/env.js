@@ -32,6 +32,7 @@ module.exports = {
     GLS_RECENT_BLOCKS_TIME_DELTA: env.GLS_RECENT_BLOCKS_TIME_DELTA || 5 * 60 * 1000,
     GLS_SAVE_GENESIS_EXAMPLES:
         Boolean(env.GLS_SAVE_GENESIS_EXAMPLES) && env.GLS_SAVE_GENESIS_EXAMPLES !== 'false',
+    GLS_NATS_MAX_IN_FLIGHT: Number(env.GLS_NATS_MAX_IN_FLIGHT) || 10,
 };
 
 function parseLocalMetricsEnv() {
