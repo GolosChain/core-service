@@ -381,7 +381,7 @@ class BlockSubscribe extends BasicService {
         block.sequence = sequence;
 
         if (this._currentBlock) {
-            Logger.info('Put block to queue', block.block_num);
+            Logger.info(`Put block to queue, seq: ${sequence}, blockNum: ${block.block_num}`);
             this._acceptedBlocksQueue.set(block.block_num, block);
             return;
         }
@@ -488,8 +488,6 @@ class BlockSubscribe extends BasicService {
 
     _setCurrentBlock(block) {
         this._currentBlock = block;
-
-        console.log('Current block =', block.block_num);
 
         setTimeout(() => {
             if (this._currentBlock === block) {
