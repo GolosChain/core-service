@@ -5,10 +5,6 @@ module.exports = MongoDB.makeModel('BlockSubscribe', {
         type: Number,
         default: 0,
     },
-    lastBlockTime: {
-        type: Date,
-        default: null,
-    },
     lastBlockSequence: {
         type: Number,
         default: 0,
