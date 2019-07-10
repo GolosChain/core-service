@@ -77,8 +77,9 @@ class BlockSubscribe extends BasicService {
         this._acceptedBlocksQueue = new Map();
         this._completeBlocksQueue = [];
         this._currentBlock = null;
-        this._subscribers = {};
+        this._subscriber = null;
         this._lastEmittedBlockNum = null;
+        this._firstSeqLogged = false;
 
         this._parallelUtils = new ParallelUtils();
 
@@ -99,8 +100,8 @@ class BlockSubscribe extends BasicService {
 
     /**
      * Получить мета-данные последнего блока.
-     * @return {{lastBlockSequence: number, lastBlockNum: number, lastBlockTime: Date/null}}
-     * Номер блока в очереди транслятора, номер блока в блокчейне, дата блока в блокчейне.
+     * @return {{lastBlockSequence: number, lastBlockNum: number}}
+     * Номер блока в очереди транслятора, номер блока в блокчейне.
      */
     async getLastBlockMetaData() {
         const model = await Model.findOne(
@@ -108,7 +109,6 @@ class BlockSubscribe extends BasicService {
             {
                 lastBlockNum: true,
                 lastBlockSequence: true,
-                lastBlockTime: true,
             },
             {
                 lean: true,
@@ -119,14 +119,12 @@ class BlockSubscribe extends BasicService {
             return {
                 lastBlockNum: 0,
                 lastBlockSequence: 0,
-                lastBlockTime: null,
             };
         }
 
         return {
             lastBlockNum: model.lastBlockNum,
             lastBlockSequence: model.lastBlockSequence,
-            lastBlockTime: model.lastBlockTime,
         };
     }
 
@@ -134,18 +132,13 @@ class BlockSubscribe extends BasicService {
      * Форсированная установка мета-данных последнего блока,
      * например актуально в случае возникновения форка.
      * @param {number} lastBlockNum Номер блока в блокчейне.
-     * @param {Date/null} lastBlockTime Дата блока в блокчейне
      * @param {number} lastBlockSequence Номер блока в очереди транслятора.
      */
-    async setLastBlockMetaData({ lastBlockNum, lastBlockTime, lastBlockSequence }) {
+    async setLastBlockMetaData({ lastBlockNum, lastBlockSequence }) {
         const update = {};
 
         if (lastBlockNum !== undefined) {
             update.lastBlockNum = lastBlockNum;
-        }
-
-        if (lastBlockTime !== undefined) {
-            update.lastBlockTime = lastBlockTime;
         }
 
         if (lastBlockSequence !== undefined) {
@@ -169,14 +162,14 @@ class BlockSubscribe extends BasicService {
     }
 
     async _extractMetaData() {
+        let lastBlockNum = null;
         let lastBlockSequence = 0;
-        let lastBlockTime = null;
 
         const model = await Model.findOne(
             {},
             {
+                lastBlockNum: true,
                 lastBlockSequence: true,
-                lastBlockTime: true,
             },
             {
                 lean: true,
@@ -184,9 +177,11 @@ class BlockSubscribe extends BasicService {
         );
 
         if (model) {
+            lastBlockNum = model.lastBlockNum;
             lastBlockSequence = model.lastBlockSequence;
-            lastBlockTime = model.lastBlockTime;
         }
+
+        this._lastBlockNum = lastBlockNum;
 
         if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
             this._lastProcessedSequence = null;
@@ -196,8 +191,6 @@ class BlockSubscribe extends BasicService {
             this._lastProcessedSequence = lastBlockSequence;
             this._isRecentSubscribeMode = false;
         }
-
-        this._lastBlockTime = lastBlockTime;
     }
 
     _connectToMessageBroker() {
@@ -242,9 +235,23 @@ class BlockSubscribe extends BasicService {
     }
 
     _subscribe() {
-        this._subscribeApplyTrx();
-        this._subscribeAcceptBlock();
-        this._subscribeCommitBlock();
+        const options = this._connection.subscriptionOptions();
+        options.setMaxInFlight(1);
+
+        if (this._isRecentSubscribeMode) {
+            Logger.info(
+                `Subscribe on blocks in recent mode, time delta: ${
+                    env.GLS_RECENT_BLOCKS_TIME_DELTA
+                }ms`
+            );
+            options.setStartAtTimeDelta(env.GLS_RECENT_BLOCKS_TIME_DELTA);
+        } else {
+            const seq = this._lastProcessedSequence + 1;
+            Logger.info(`Subscribe on blocks, seq: ${seq}`);
+            options.setStartAtSequence(seq);
+        }
+
+        this._subscribeOnEvents('Blocks', options);
     }
 
     _unsubscribe() {
@@ -257,7 +264,8 @@ class BlockSubscribe extends BasicService {
             // чтобы случайные ошибки из соединения не убили приложение
         });
 
-        for (const { subscriber, handler } of Object.values(this._subscribers)) {
+        if (this._subscriber) {
+            const { subscriber, handler } = this._subscriber;
             subscriber.removeListener('message', handler);
 
             try {
@@ -271,90 +279,60 @@ class BlockSubscribe extends BasicService {
             this._connection.close();
         } catch (err) {}
 
-        this._subscribers = {};
+        this._subscriber = null;
+        this._firstSeqLogged = false;
         this._connection = null;
     }
 
-    _subscribeAcceptBlock() {
-        const options = this._connection.subscriptionOptions();
-        options.setMaxInFlight(1);
-
-        if (this._isRecentSubscribeMode) {
-            options.setStartAtTimeDelta(env.GLS_RECENT_BLOCKS_TIME_DELTA);
-        } else {
-            options.setStartAtSequence(this._lastProcessedSequence + 1);
-        }
-
-        this._subscribeOnEvents(
-            'AcceptBlock',
-            options,
-            'core_block_accept',
-            this._handleBlockAccept
-        );
-    }
-
-    _subscribeApplyTrx() {
-        const options = this._connection.subscriptionOptions();
-        options.setMaxInFlight(env.GLS_MAX_IN_FLIGHT_TRANSACTIONS);
-
-        if (this._isRecentSubscribeMode) {
-            // Для транзакций ставим интервал с запасом,
-            // чтобы скачались все транзакции нужные для первого блока
-            options.setStartAtTimeDelta(
-                env.GLS_RECENT_BLOCKS_TIME_DELTA + env.GLS_TRANSACTIONS_TIME_GAP
-            );
-        } else {
-            if (this._lastBlockTime) {
-                // Начинаем собирать транзакции для блоков с запасом по времени
-                const startTime = new Date(
-                    new Date(this._lastBlockTime).getTime() - env.GLS_TRANSACTIONS_TIME_GAP
-                );
-
-                options.setStartTime(startTime);
-            } else {
-                options.setDeliverAllAvailable();
-            }
-        }
-
-        this._subscribeOnEvents(
-            'ApplyTrx',
-            options,
-            'core_trx_apply',
-            this._handleTransactionApply
-        );
-    }
-
-    _subscribeCommitBlock() {
-        const options = this._connection.subscriptionOptions();
-        options.setMaxInFlight(1);
-        options.setStartWithLastReceived();
-
-        this._subscribeOnEvents(
-            'CommitBlock',
-            options,
-            'core_block_commit',
-            this._handleBlockCommit
-        );
-    }
-
-    _subscribeOnEvents(eventName, options, metricName, handler) {
+    _subscribeOnEvents(eventName, options) {
         const subscriber = this._connection.subscribe(eventName, options);
 
         const handlerWrapper = message => {
-            const data = this._parseMessageData(message);
-            handler.call(this, data);
-            metrics.inc(metricName);
+            let sequence;
+            let data;
+
+            try {
+                sequence = message.getSequence();
+                data = JSON.parse(message.getData());
+            } catch (error) {
+                Logger.error(`Invalid blockchain message, seq: ${sequence}`, error);
+                process.exit(1);
+            }
+
+            if (!this._firstSeqLogged) {
+                Logger.info(`First event received, seq: ${sequence}`);
+                this._firstSeqLogged = true;
+            }
+
+            this._handleEvent(data, sequence);
         };
 
         subscriber.on('message', handlerWrapper);
 
-        this._subscribers[eventName] = {
+        this._subscriber = {
             subscriber,
             handler: handlerWrapper,
         };
     }
 
-    _handleTransactionApply({ data: transaction }) {
+    _handleEvent(data, sequence) {
+        switch (data.msg_type) {
+            case 'ApplyTrx':
+                this._handleTransactionApply(data);
+                return;
+            case 'AcceptBlock':
+                this._handleBlockAccept(data, sequence);
+                return;
+            case 'CommitBlock':
+                this._handleBlockCommit(data);
+                return;
+            default:
+        }
+    }
+
+    _handleTransactionApply(transaction) {
+        metrics.inc('core_trx_apply');
+
         if (this._lastBlockNum && this._lastBlockNum >= transaction.block_num) {
             return;
         }
@@ -373,7 +351,9 @@ class BlockSubscribe extends BasicService {
         }
     }
 
-    _handleBlockAccept({ data: block, sequence }) {
+    _handleBlockAccept(block, sequence) {
+        metrics.inc('core_block_accept');
+
         if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
             if (sequence < this._ignoreSequencesLess) {
                 return;
@@ -400,8 +380,9 @@ class BlockSubscribe extends BasicService {
 
         block.sequence = sequence;
 
-        if (this._lastProcessedSequence !== null && this._lastProcessedSequence + 1 !== sequence) {
-            this._acceptedBlocksQueue.set(sequence, block);
+        if (this._currentBlock) {
+            Logger.info('Put block to queue', block.block_num);
+            this._acceptedBlocksQueue.set(block.block_num, block);
             return;
         }
 
@@ -469,17 +450,14 @@ class BlockSubscribe extends BasicService {
     }
 
     _finalizeBlock(block, transactions) {
-        const blockTime = this._parseDate(block.block_time);
-
         this._lastBlockNum = block.block_num;
-        this._lastBlockTime = blockTime;
 
         const blockData = {
             id: block.id,
             parentId: block.previous,
             sequence: block.sequence,
             blockNum: block.block_num,
-            blockTime,
+            blockTime: this._parseDate(block.block_time),
             transactions,
         };
 
@@ -498,11 +476,11 @@ class BlockSubscribe extends BasicService {
     }
 
     _checkBlockQueue() {
-        const nextSequence = this._lastProcessedSequence + 1;
+        const nextBlockNum = this._lastBlockNum + 1;
 
-        if (this._acceptedBlocksQueue.has(nextSequence)) {
-            this._setCurrentBlock(this._acceptedBlocksQueue.get(nextSequence));
-            this._acceptedBlocksQueue.delete(nextSequence);
+        if (this._acceptedBlocksQueue.has(nextBlockNum)) {
+            this._setCurrentBlock(this._acceptedBlocksQueue.get(nextBlockNum));
+            this._acceptedBlocksQueue.delete(nextBlockNum);
 
             this._tryToAcceptCurrentBlock();
         }
@@ -510,6 +488,8 @@ class BlockSubscribe extends BasicService {
 
     _setCurrentBlock(block) {
         this._currentBlock = block;
+
+        console.log('Current block =', block.block_num);
 
         setTimeout(() => {
             if (this._currentBlock === block) {
@@ -534,7 +514,9 @@ class BlockSubscribe extends BasicService {
         }, env.GLS_WAIT_FOR_TRANSACTION_TIMEOUT);
     }
 
-    _handleBlockCommit({ data: block }) {
+    _handleBlockCommit(block) {
+        metrics.inc('core_block_commit');
+
         const { block_num: irreversibleNum } = block;
 
         this._lastIrreversibleNum = irreversibleNum;
@@ -576,18 +558,6 @@ class BlockSubscribe extends BasicService {
         this._blockHandler(block);
     }
 
-    _parseMessageData(message) {
-        try {
-            return {
-                sequence: message.getSequence(),
-                data: JSON.parse(message.getData()),
-            };
-        } catch (error) {
-            Logger.error('Invalid blockchain message:', error);
-            process.exit(1);
-        }
-    }
-
     _cleanOldTransactions(lastProcessedBlockNum) {
         for (const blockNum of this._blockNumTransactions.keys()) {
             if (blockNum <= lastProcessedBlockNum) {
@@ -615,7 +585,6 @@ class BlockSubscribe extends BasicService {
             {
                 $set: {
                     lastBlockNum: block.blockNum,
-                    lastBlockTime: block.blockTime,
                     lastBlockSequence: block.sequence,
                 },
             }
