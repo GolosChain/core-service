@@ -75,11 +75,14 @@ class BlockSubscribe extends BasicService {
 
         this._blockNumTransactions = new Map();
         this._acceptedBlocksQueue = new Map();
+        this._eventsQueue = new Map();
         this._completeBlocksQueue = [];
         this._currentBlock = null;
         this._subscriber = null;
         this._lastEmittedBlockNum = null;
-        this._firstSeqLogged = false;
+        this._firstMessageReceived = false;
+        this._subscribeSeq = null;
+        this._processedSeq = null;
 
         this._parallelUtils = new ParallelUtils();
 
@@ -219,7 +222,7 @@ class BlockSubscribe extends BasicService {
 
     _onConnectionError(err) {
         if (err.code !== 'BAD_SUBJECT') {
-            Logger.error('Nats "error" event:', err);
+            Logger.error('Nats error:', err.message);
         }
 
         this._unsubscribe();
@@ -236,7 +239,7 @@ class BlockSubscribe extends BasicService {
 
     _subscribe() {
         const options = this._connection.subscriptionOptions();
-        options.setMaxInFlight(1);
+        options.setMaxInFlight(env.GLS_NATS_MAX_IN_FLIGHT);
 
         if (this._isRecentSubscribeMode) {
             Logger.info(
@@ -248,6 +251,7 @@ class BlockSubscribe extends BasicService {
         } else {
             const seq = this._lastProcessedSequence + 1;
             Logger.info(`Subscribe on blocks, seq: ${seq}`);
+            this._subscribeSeq = seq;
             options.setStartAtSequence(seq);
         }
 
@@ -280,7 +284,9 @@ class BlockSubscribe extends BasicService {
         } catch (err) {}
 
         this._subscriber = null;
-        this._firstSeqLogged = false;
+        this._firstMessageReceived = false;
+        this._processedSeq = null;
+        this._subscribeSeq = null;
         this._connection = null;
     }
 
@@ -299,12 +305,41 @@ class BlockSubscribe extends BasicService {
                 process.exit(1);
             }
 
-            if (!this._firstSeqLogged) {
+            if (this._firstMessageReceived) {
+                if (sequence > this._processedSeq + 1) {
+                    metrics.inc('core_nats_unordered_event');
+                    this._eventsQueue.set(sequence, data);
+                    return;
+                }
+            } else {
+                if (this._subscribeSeq && this._subscribeSeq !== sequence) {
+                    Logger.error(
+                        `Received sequence doesn't match to subscribe sequence, subscribe: ${
+                            this._subscribeSeq
+                        }, received: ${sequence}`
+                    );
+                    process.exit(1);
+                }
+
                 Logger.info(`First event received, seq: ${sequence}`);
-                this._firstSeqLogged = true;
+                this._firstMessageReceived = true;
+                this._processedSeq = sequence;
             }
 
             this._handleEvent(data, sequence);
+
+            // Если в очереди уже есть следующие события, то применяем их.
+            for (let currentSequence = sequence + 1; ; currentSequence++) {
+                const eventData = this._eventsQueue.get(currentSequence);
+
+                if (!eventData) {
+                    break;
+                }
+
+                this._eventsQueue.delete(currentSequence);
+
+                this._handleEvent(eventData, currentSequence);
+            }
         };
 
         subscriber.on('message', handlerWrapper);
@@ -319,15 +354,17 @@ class BlockSubscribe extends BasicService {
         switch (data.msg_type) {
             case 'ApplyTrx':
                 this._handleTransactionApply(data);
-                return;
+                break;
             case 'AcceptBlock':
                 this._handleBlockAccept(data, sequence);
-                return;
+                break;
             case 'CommitBlock':
                 this._handleBlockCommit(data);
-                return;
+                break;
             default:
         }
+
+        this._processedSeq = sequence;
     }
 
     _handleTransactionApply(transaction) {
