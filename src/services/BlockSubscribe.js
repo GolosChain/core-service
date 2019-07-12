@@ -9,10 +9,9 @@ const Model = require('../models/BlockSubscribe');
 /**
  * Сервис подписки получения новых блоков.
  * Подписывается на рассылку блоков от CyberWay-ноды.
- * Каждый полученный блок сериализуется и передается
- * в колбек метода eachBlock, также этот метод гарантирует
- * последовательное поступление блоков, а колбек вызвается
- * через await.
+ * Каждый полученный блок сериализуется и передается в обработчик handle,
+ * также этот метод гарантирует последовательное поступление блоков.
+ * Колбек вызвается через await.
  *
  * Предполагается что MongoDB была инициализирована и в неё
  * можно что-то записать и из неё что-то прочитать,
@@ -29,19 +28,26 @@ class BlockSubscribe extends BasicService {
      */
 
     /**
-     * Оповещает о текущем номере неоткатного блока.
-     * @event irreversibleBlockNum
-     * @property {number} irreversibleBlockNum Номер неоткатного блока.
-     */
-
-    /**
      * В случае если очередь блокчейн-ноды уже не хранит необходимые
-     * блоки будет выведено предупреждение.
+     * блоки будет выведена ошибка.
      * TODO: Если нужные сообщения в nats уже исчезли надо что-то делать!
-     * @param {Function} blockHandler
-     *   Обработчик новых блоков, вызывается с await
-     * @param {boolean} [onlyIrreversible]
-     *   В случае true эвенты будут возвращать только неоткатные блоки
+     * @param {Function} handler
+     *   Обработчик событий, вызывается с await.
+     *   События:
+     *   1. При получении очередного блока:
+     *     {  type: 'BLOCK',
+     *        data: <block>,
+     *     }
+     *   2. При получении неоткатных блоков:
+     *     {  type: 'IRREVERSIBLE_BLOCK',
+     *        data: <block>,
+     *     }
+     *   3. При возникновении форка:
+     *     {  type: 'FORK',
+     *        data: {
+     *            baseBlockNum: <number>,
+     *        }
+     *     }
      * @param {boolean} [includeAllTransactions]
      *   Если не нужно отбрасывать протухшие транзакции
      * @param {string} [serverName]
@@ -52,12 +58,11 @@ class BlockSubscribe extends BasicService {
      *   Строка подключения (с авторизацией), в ином случае берется из env.
      */
     constructor({
-        onlyIrreversible = false,
         includeAllTransactions = false,
         serverName = env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
         clientName = env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
         connectString = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
-        blockHandler,
+        handler,
     } = {}) {
         super();
 
@@ -67,28 +72,28 @@ class BlockSubscribe extends BasicService {
         this._onConnectionClose = this._onConnectionClose.bind(this);
         this._onConnectionError = this._onConnectionError.bind(this);
 
-        this._onlyIrreversible = onlyIrreversible;
         this._includeAll = includeAllTransactions;
-        this._serverName = serverName;
-        this._clientName = clientName;
-        this._connectString = connectString;
 
-        this._blockNumTransactions = new Map();
-        this._acceptedBlocksQueue = new Map();
-        this._eventsQueue = new Map();
-        this._completeBlocksQueue = [];
-        this._currentBlock = null;
+        this._nastConnectParams = [serverName, clientName, { url: connectString }];
+
         this._subscriber = null;
-        this._lastEmittedBlockNum = null;
-        this._firstMessageReceived = false;
+
+        this._eventsQueue = new Map();
         this._subscribeSeq = null;
         this._processedSeq = null;
+        this._blockNumTransactions = new Map();
+        this._completeBlocksQueue = new Map();
+        this._waitForFirstEvent = true;
+        this._lastEmittedBlockNum = null;
+        this._lastEmittedIrreversibleBlockNum = null;
 
         this._parallelUtils = new ParallelUtils();
 
-        this._blockHandler = this._parallelUtils.consequentially(async block => {
-            await this._setLastBlock(block);
-            await blockHandler(block);
+        this._handler = this._parallelUtils.consequentially(async event => {
+            if (event.type === 'block') {
+                await this._setLastBlock(event.data);
+            }
+            await handler(event);
         });
     }
 
@@ -113,9 +118,7 @@ class BlockSubscribe extends BasicService {
                 lastBlockNum: true,
                 lastBlockSequence: true,
             },
-            {
-                lean: true,
-            }
+            { lean: true }
         );
 
         if (!model) {
@@ -133,7 +136,7 @@ class BlockSubscribe extends BasicService {
 
     /**
      * Форсированная установка мета-данных последнего блока,
-     * например актуально в случае возникновения форка.
+     * например актуально в случае возникновения ошибки при обработке блока.
      * @param {number} lastBlockNum Номер блока в блокчейне.
      * @param {number} lastBlockSequence Номер блока в очереди транслятора.
      */
@@ -165,26 +168,10 @@ class BlockSubscribe extends BasicService {
     }
 
     async _extractMetaData() {
-        let lastBlockNum = null;
-        let lastBlockSequence = 0;
-
-        const model = await Model.findOne(
-            {},
-            {
-                lastBlockNum: true,
-                lastBlockSequence: true,
-            },
-            {
-                lean: true,
-            }
-        );
-
-        if (model) {
-            lastBlockNum = model.lastBlockNum;
-            lastBlockSequence = model.lastBlockSequence;
-        }
+        const { lastBlockNum, lastBlockSequence } = await this.getLastBlockMetaData();
 
         this._lastBlockNum = lastBlockNum;
+        this._lastEmittedBlockNum = lastBlockNum;
 
         if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
             this._lastProcessedSequence = null;
@@ -197,13 +184,7 @@ class BlockSubscribe extends BasicService {
     }
 
     _connectToMessageBroker() {
-        this._connection = nats.connect(
-            this._serverName,
-            this._clientName,
-            {
-                url: this._connectString,
-            }
-        );
+        this._connection = nats.connect(...this._nastConnectParams);
 
         this._connection.on('connect', this._onConnectionConnect);
         this._connection.on('close', this._onConnectionClose);
@@ -211,7 +192,7 @@ class BlockSubscribe extends BasicService {
     }
 
     _onConnectionConnect() {
-        Logger.log('Blockchain block broadcaster connected.');
+        Logger.log('Blockchain block subscriber connected.');
         this._subscribe();
     }
 
@@ -242,52 +223,16 @@ class BlockSubscribe extends BasicService {
         options.setMaxInFlight(env.GLS_NATS_MAX_IN_FLIGHT);
 
         if (this._isRecentSubscribeMode) {
-            Logger.info(
-                `Subscribe on blocks in recent mode, time delta: ${
-                    env.GLS_RECENT_BLOCKS_TIME_DELTA
-                }ms`
-            );
-            options.setStartAtTimeDelta(env.GLS_RECENT_BLOCKS_TIME_DELTA);
+            const delta = env.GLS_RECENT_BLOCKS_TIME_DELTA;
+            Logger.info(`Subscribe on blocks in recent mode, time delta: ${delta}ms`);
+            options.setStartAtTimeDelta(delta);
         } else {
-            const seq = this._lastProcessedSequence + 1;
-            Logger.info(`Subscribe on blocks, seq: ${seq}`);
-            this._subscribeSeq = seq;
-            options.setStartAtSequence(seq);
+            this._subscribeSeq = this._lastProcessedSequence + 1;
+            Logger.info(`Subscribe on blocks, seq: ${this._subscribeSeq}`);
+            options.setStartAtSequence(this._subscribeSeq);
         }
 
         this._subscribeOnEvents('Blocks', options);
-    }
-
-    _unsubscribe() {
-        this._connection.removeListener('connect', this._onConnectionConnect);
-        this._connection.removeListener('close', this._onConnectionClose);
-        this._connection.removeListener('error', this._onConnectionError);
-
-        this._connection.on('error', () => {
-            // Вешаем пустой обработчик ошибки на отключаемое соединение,
-            // чтобы случайные ошибки из соединения не убили приложение
-        });
-
-        if (this._subscriber) {
-            const { subscriber, handler } = this._subscriber;
-            subscriber.removeListener('message', handler);
-
-            try {
-                subscriber.unsubscribe();
-            } catch {
-                // Do nothing
-            }
-        }
-
-        try {
-            this._connection.close();
-        } catch (err) {}
-
-        this._subscriber = null;
-        this._firstMessageReceived = false;
-        this._processedSeq = null;
-        this._subscribeSeq = null;
-        this._connection = null;
     }
 
     _subscribeOnEvents(eventName, options) {
@@ -305,40 +250,32 @@ class BlockSubscribe extends BasicService {
                 process.exit(1);
             }
 
-            if (this._firstMessageReceived) {
-                if (sequence > this._processedSeq + 1) {
+            try {
+                if (this._waitForFirstEvent) {
+                    if (this._subscribeSeq && this._subscribeSeq !== sequence) {
+                        Logger.error(
+                            `Received sequence doesn't match to subscribe sequence, subscribe: ${
+                                this._subscribeSeq
+                            }, received: ${sequence}`
+                        );
+                        process.exit(1);
+                    }
+
+                    Logger.info(`First event received, seq: ${sequence}`);
+                    this._waitForFirstEvent = false;
+                } else if (sequence > this._processedSeq + 1) {
                     metrics.inc('core_nats_unordered_event');
                     this._eventsQueue.set(sequence, data);
                     return;
                 }
-            } else {
-                if (this._subscribeSeq && this._subscribeSeq !== sequence) {
-                    Logger.error(
-                        `Received sequence doesn't match to subscribe sequence, subscribe: ${
-                            this._subscribeSeq
-                        }, received: ${sequence}`
-                    );
-                    process.exit(1);
-                }
 
-                Logger.info(`First event received, seq: ${sequence}`);
-                this._firstMessageReceived = true;
                 this._processedSeq = sequence;
-            }
 
-            this._handleEvent(data, sequence);
-
-            // Если в очереди уже есть следующие события, то применяем их.
-            for (let currentSequence = sequence + 1; ; currentSequence++) {
-                const eventData = this._eventsQueue.get(currentSequence);
-
-                if (!eventData) {
-                    break;
-                }
-
-                this._eventsQueue.delete(currentSequence);
-
-                this._handleEvent(eventData, currentSequence);
+                this._handleEvent(data, sequence);
+                this._checkEventsQueue(sequence);
+            } catch (err) {
+                Logger.error('BlockSubscribe: Event processing failed:', err);
+                process.exit(1);
             }
         };
 
@@ -350,7 +287,57 @@ class BlockSubscribe extends BasicService {
         };
     }
 
+    _checkEventsQueue(sequence) {
+        // Если в очереди уже есть следующие события, то применяем их.
+        for (let currentSequence = sequence + 1; ; currentSequence++) {
+            const eventData = this._eventsQueue.get(currentSequence);
+
+            if (!eventData) {
+                break;
+            }
+
+            this._eventsQueue.delete(currentSequence);
+
+            this._handleEvent(eventData, currentSequence);
+        }
+    }
+
+    _unsubscribe() {
+        this._connection.removeListener('connect', this._onConnectionConnect);
+        this._connection.removeListener('close', this._onConnectionClose);
+        this._connection.removeListener('error', this._onConnectionError);
+
+        // Вешаем пустой обработчик ошибки на отключаемое соединение,
+        // чтобы случайные ошибки из закрываемого соединения не убили приложение.
+        this._connection.on('error', () => {});
+
+        if (this._subscriber) {
+            const { subscriber, handler } = this._subscriber;
+            subscriber.removeListener('message', handler);
+
+            try {
+                subscriber.unsubscribe();
+            } catch {
+                // Do nothing
+            }
+        }
+
+        try {
+            this._connection.close();
+        } catch (err) {}
+
+        this._subscriber = null;
+        this._waitForFirstEvent = true;
+        this._processedSeq = null;
+        this._subscribeSeq = null;
+        this._connection = null;
+    }
+
     _handleEvent(data, sequence) {
+        if (env.GLS_USE_ONLY_RECENT_BLOCKS && sequence < this._ignoreSequencesLess) {
+            return;
+        }
+
         switch (data.msg_type) {
             case 'ApplyTrx':
                 this._handleTransactionApply(data);
@@ -363,8 +350,6 @@ class BlockSubscribe extends BasicService {
                 break;
             default:
         }
-
-        this._processedSeq = sequence;
     }
 
     _handleTransactionApply(transaction) {
@@ -382,20 +367,12 @@ class BlockSubscribe extends BasicService {
         }
 
         transactions.set(transaction.id, transaction);
-
-        if (this._currentBlock) {
-            this._tryToAcceptCurrentBlock();
-        }
     }
 
     _handleBlockAccept(block, sequence) {
         metrics.inc('core_block_accept');
 
         if (env.GLS_USE_ONLY_RECENT_BLOCKS) {
-            if (sequence < this._ignoreSequencesLess) {
-                return;
-            }
-
             if (this._lastProcessedSequence === null) {
                 this._lastProcessedSequence = sequence - 1;
             }
@@ -411,41 +388,12 @@ class BlockSubscribe extends BasicService {
             return;
         }
 
-        if (!block.validated) {
-            return;
-        }
-
         block.sequence = sequence;
 
-        if (this._currentBlock) {
-            Logger.info(`Put block to queue, seq: ${sequence}, blockNum: ${block.block_num}`);
-            this._acceptedBlocksQueue.set(block.block_num, block);
-            return;
-        }
-
-        this._setCurrentBlock(block);
-
-        this._tryToAcceptCurrentBlock();
+        this._finalizeBlock(block);
     }
 
-    _tryToAcceptCurrentBlock({ skipMissedTransactions = false } = {}) {
-        const block = this._currentBlock;
-
-        const { transactions, isAll } = this._extractTransactions({
-            skipMissedTransactions,
-        });
-
-        if (!isAll) {
-            return;
-        }
-
-        this._finalizeBlock(block, transactions);
-
-        this._checkBlockQueue();
-    }
-
-    _extractTransactions({ skipMissedTransactions }) {
-        const block = this._currentBlock;
+    _extractTransactions(block) {
         const transactions = [];
 
         for (const trxMeta of block.trxs) {
@@ -456,16 +404,9 @@ class BlockSubscribe extends BasicService {
             const blockNumTransactions = this._blockNumTransactions.get(block.block_num);
             const trx = blockNumTransactions ? blockNumTransactions.get(trxMeta.id) : null;
 
-            // Если нет нужной транзакции, то прекращаем обработку, и при каждой
-            // новой транзакции проверяем снова весь список.
             if (!trx) {
-                if (skipMissedTransactions) {
-                    continue;
-                }
-
-                return {
-                    isAll: false,
-                };
+                Logger.error(`Transaction (${trxMeta.id}) is not found in ApplyTrx feed`);
+                process.exit(1);
             }
 
             const stats = { ...trxMeta };
@@ -480,13 +421,12 @@ class BlockSubscribe extends BasicService {
             });
         }
 
-        return {
-            transactions,
-            isAll: true,
-        };
+        return transactions;
     }
 
-    _finalizeBlock(block, transactions) {
+    _finalizeBlock(block) {
+        const transactions = this._extractTransactions(block);
+
         this._lastBlockNum = block.block_num;
 
         const blockData = {
@@ -498,99 +438,78 @@ class BlockSubscribe extends BasicService {
             transactions,
         };
 
-        if (this._onlyIrreversible) {
-            this._completeBlocksQueue.push(blockData);
-            this._processIrreversibleBlocks();
-        } else {
-            this._emitBlock(blockData);
-        }
+        this._emitBlock(blockData);
+        this._completeBlocksQueue.set(blockData.blockNum, blockData);
+        this._processIrreversibleBlocks();
 
         this._isRecentSubscribeMode = false;
-        this._currentBlock = null;
         this._lastProcessedSequence = block.sequence;
 
         this._cleanOldTransactions(block.block_num);
     }
 
-    _checkBlockQueue() {
-        const nextBlockNum = this._lastBlockNum + 1;
-
-        if (this._acceptedBlocksQueue.has(nextBlockNum)) {
-            this._setCurrentBlock(this._acceptedBlocksQueue.get(nextBlockNum));
-            this._acceptedBlocksQueue.delete(nextBlockNum);
-
-            this._tryToAcceptCurrentBlock();
-        }
-    }
-
-    _setCurrentBlock(block) {
-        this._currentBlock = block;
-
-        setTimeout(() => {
-            if (this._currentBlock === block) {
-                Logger.error(
-                    `Transactions wait timeout reached, blockId: ${block.id} blockNum: ${
-                        block.block_num
-                    }`
-                );
-
-                for (const { id } of block.trxs) {
-                    if (!this._blockNumTransactions.has(id)) {
-                        Logger.error(`Missed transaction: ${id}`);
-                    }
-                }
-
-                if (env.GLS_ALLOW_TRANSACTION_MISS) {
-                    this._tryToAcceptCurrentBlock({ skipMissedTransactions: true });
-                } else {
-                    process.exit(1);
-                }
-            }
-        }, env.GLS_WAIT_FOR_TRANSACTION_TIMEOUT);
-    }
-
     _handleBlockCommit(block) {
         metrics.inc('core_block_commit');
 
-        const { block_num: irreversibleNum } = block;
+        this._lastIrreversibleNum = block.block_num;
 
-        this._lastIrreversibleNum = irreversibleNum;
-
-        this.emit('irreversibleBlockNum', irreversibleNum);
-
-        if (this._onlyIrreversible) {
-            this._processIrreversibleBlocks();
-        }
+        this._processIrreversibleBlocks();
     }
 
     _processIrreversibleBlocks() {
-        while (this._completeBlocksQueue.length) {
-            const block = this._completeBlocksQueue[0];
+        if (this._completeBlocksQueue.size === 0) {
+            return;
+        }
 
-            if (block.blockNum <= this._lastIrreversibleNum) {
-                this._completeBlocksQueue.shift();
-                this._emitBlock(block);
-            } else {
-                // Дальше идти нет смысла, потому что в массиве блоки упорядочены по blockNum
-                break;
+        let startBlockNum;
+
+        if (this._lastEmittedIrreversibleBlockNum) {
+            startBlockNum = this._lastEmittedIrreversibleBlockNum + 1;
+        } else {
+            startBlockNum = Math.min(...this._completeBlocksQueue.keys());
+        }
+
+        for (let blockNum = startBlockNum; blockNum <= this._lastIrreversibleNum; blockNum++) {
+            const block = this._completeBlocksQueue.get(blockNum);
+
+            if (!block) {
+                Logger.error(
+                    `Irreversible block (${blockNum}) is not found in queue, irreversible block num: ${
+                        this._lastIrreversibleNum
+                    }`
+                );
+                process.exit(1);
             }
+
+            this._completeBlocksQueue.delete(blockNum);
+
+            this._handler({
+                type: 'IRREVERSIBLE_BLOCK',
+                data: block,
+            });
+
+            this._lastEmittedIrreversibleBlockNum = block.blockNum;
         }
     }
 
     _emitBlock(block) {
-        if (this._lastEmittedBlockNum && block.blockNum !== this._lastEmittedBlockNum + 1) {
-            Logger.error('Unordered blocks emitting!');
-            Logger.error(
-                `Previous blockNum: ${this._lastEmittedBlockNum}, current blockNum: ${
-                    block.blockNum
-                }`
-            );
-            process.exit(1);
+        if (this._lastEmittedBlockNum && block.blockNum <= this._lastEmittedBlockNum) {
+            this._handler({
+                type: 'FORK',
+                data: {
+                    baseBlockNum: block.blockNum - 1,
+                },
+            });
         }
 
         metrics.inc('core_block_received');
 
-        this._blockHandler(block);
+        this._handler({
+            type: 'BLOCK',
+            data: block,
+        });
+
+        this._lastEmittedBlockNum = block.blockNum;
     }
 
     _cleanOldTransactions(lastProcessedBlockNum) {
@@ -604,8 +523,8 @@ class BlockSubscribe extends BasicService {
     _parseDate(dateString) {
         let time = dateString;
 
-        // Convert invalid format
-        // "2019-06-13T19:31:13.838" (without time zone) into
+        // Правим некорректный формат дат
+        // "2019-06-13T19:31:13.838" (без тайм-зоны) в
         // "2019-06-13T19:31:13.838Z"
         if (time.length === 23) {
             time += 'Z';
