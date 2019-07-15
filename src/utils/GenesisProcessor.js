@@ -200,7 +200,7 @@ class GenesisProcessor {
         options.setMaxInFlight(50);
         options.setStartAtSequence(this._lastProcessedSeq + 1);
 
-        this._subscription = this._nats.subscribe('GenesisData', options);
+        this._subscription = this._nats.subscribe('Genesis', options);
         this._subscription.on('message', this._onMessage);
         this._subscription.on('error', this._onNatsError);
     }
