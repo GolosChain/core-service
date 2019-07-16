@@ -6,6 +6,12 @@ const ParallelUtils = require('../utils/Parallel');
 const metrics = require('../utils/metrics');
 const Model = require('../models/BlockSubscribe');
 
+const EVENT_TYPES = {
+    BLOCK: 'BLOCK',
+    IRREVERSIBLE_BLOCK: 'IRREVERSIBLE_BLOCK',
+    FORK: 'FORK',
+};
+
 /**
  * Сервис подписки получения новых блоков.
  * Подписывается на рассылку блоков от CyberWay-ноды.
@@ -85,7 +91,7 @@ class BlockSubscribe extends BasicService {
         this._parallelUtils = new ParallelUtils();
 
         this._handler = this._parallelUtils.consequentially(async event => {
-            if (event.type === 'block') {
+            if (event.type === EVENT_TYPES.BLOCK) {
                 await this._setLastBlock(event.data);
             }
             await handler(event);
@@ -488,7 +494,7 @@ class BlockSubscribe extends BasicService {
             this._completeBlocksQueue.delete(blockNum);
 
             this._handler({
-                type: 'IRREVERSIBLE_BLOCK',
+                type: EVENT_TYPES.IRREVERSIBLE_BLOCK,
                 data: block,
             });
 
@@ -499,7 +505,7 @@ class BlockSubscribe extends BasicService {
     _emitBlock(block) {
         if (this._lastEmittedBlockNum && block.blockNum <= this._lastEmittedBlockNum) {
             this._handler({
-                type: 'FORK',
+                type: EVENT_TYPES.FORK,
                 data: {
                     baseBlockNum: block.blockNum - 1,
                 },
@@ -509,7 +515,7 @@ class BlockSubscribe extends BasicService {
         metrics.inc('core_block_received');
 
         this._handler({
-            type: 'BLOCK',
+            type: EVENT_TYPES.BLOCK,
             data: block,
         });
 
@@ -549,5 +555,7 @@ class BlockSubscribe extends BasicService {
         );
     }
 }
+
+BlockSubscribe.EVENT_TYPES = EVENT_TYPES;
 
 module.exports = BlockSubscribe;
