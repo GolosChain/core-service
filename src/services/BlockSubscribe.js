@@ -48,8 +48,6 @@ class BlockSubscribe extends BasicService {
      *            baseBlockNum: <number>,
      *        }
      *     }
-     * @param {boolean} [includeAllTransactions]
-     *   Если не нужно отбрасывать протухшие транзакции
      * @param {string} [serverName]
      *   Имя сервера для подписки, в ином случае берется из env.
      * @param {string} [clientName]
@@ -58,7 +56,6 @@ class BlockSubscribe extends BasicService {
      *   Строка подключения (с авторизацией), в ином случае берется из env.
      */
     constructor({
-        includeAllTransactions = false,
         serverName = env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
         clientName = env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
         connectString = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
@@ -71,8 +68,6 @@ class BlockSubscribe extends BasicService {
         this._onConnectionConnect = this._onConnectionConnect.bind(this);
         this._onConnectionClose = this._onConnectionClose.bind(this);
         this._onConnectionError = this._onConnectionError.bind(this);
-
-        this._includeAll = includeAllTransactions;
 
         this._nastConnectParams = [serverName, clientName, { url: connectString }];
 
@@ -395,9 +390,14 @@ class BlockSubscribe extends BasicService {
 
     _extractTransactions(block) {
         const transactions = [];
+        const counters = {
+            executed: 0,
+        };
 
         for (const trxMeta of block.trxs) {
-            if (trxMeta.status !== 'executed' && !this._includeAll) {
+            counters[trxMeta.status] = (counters[trxMeta.status] || 0) + 1;
+
+            if (trxMeta.status !== 'executed') {
                 continue;
             }
 
@@ -421,11 +421,14 @@ class BlockSubscribe extends BasicService {
             });
         }
 
-        return transactions;
+        return {
+            transactions,
+            counters,
+        };
     }
 
     _finalizeBlock(block) {
-        const transactions = this._extractTransactions(block);
+        const { transactions, counters } = this._extractTransactions(block);
 
         this._lastBlockNum = block.block_num;
 
@@ -436,6 +439,7 @@ class BlockSubscribe extends BasicService {
             blockNum: block.block_num,
             blockTime: this._parseDate(block.block_time),
             transactions,
+            counters,
         };
 
         this._emitBlock(blockData);
