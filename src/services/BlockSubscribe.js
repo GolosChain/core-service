@@ -87,6 +87,7 @@ class BlockSubscribe extends BasicService {
         this._waitForFirstEvent = true;
         this._lastEmittedBlockNum = null;
         this._lastEmittedIrreversibleBlockNum = null;
+        this._ignoreSequencesLess = null;
 
         this._parallelUtils = new ParallelUtils();
 
@@ -178,6 +179,7 @@ class BlockSubscribe extends BasicService {
             this._lastProcessedSequence = null;
             this._ignoreSequencesLess = lastBlockSequence + 1;
             this._isRecentSubscribeMode = true;
+            this._isFirstRecentBlockSkipped = false;
         } else {
             this._lastProcessedSequence = lastBlockSequence;
             this._isRecentSubscribeMode = false;
@@ -335,7 +337,14 @@ class BlockSubscribe extends BasicService {
     }
 
     _handleEvent(data, sequence) {
-        if (env.GLS_USE_ONLY_RECENT_BLOCKS && sequence < this._ignoreSequencesLess) {
+        if (this._ignoreSequencesLess && sequence < this._ignoreSequencesLess) {
+            return;
+        }
+
+        if (env.GLS_USE_ONLY_RECENT_BLOCKS && !this._isFirstRecentBlockSkipped) {
+            if (data.msg_type === 'AcceptBlock') {
+                this._isFirstRecentBlockSkipped = true;
+            }
             return;
         }
 
