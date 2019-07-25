@@ -76,9 +76,10 @@ class MongoDB extends BasicService {
      * окружения, либо по явно указанной строке подключеня.
      * @param {string/null} [forceConnectString] Строка подключения,
      * не обязательна.
+     * @param {Object} [options] Настройки подключения к базе.
      * @returns {Promise<*>} Промис без экстра данных.
      */
-    async start(forceConnectString = null) {
+    async start(forceConnectString = null, options = {}) {
         return new Promise(resolve => {
             const connection = mongoose.connection;
 
@@ -92,7 +93,10 @@ class MongoDB extends BasicService {
                 resolve();
             });
 
-            mongoose.connect(forceConnectString || env.GLS_MONGO_CONNECT);
+            mongoose.connect(
+                forceConnectString || env.GLS_MONGO_CONNECT,
+                { useNewUrlParser: true, ...options }
+            );
         });
     }
 
