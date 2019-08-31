@@ -31,6 +31,7 @@ module.exports = {
     GLS_SAVE_GENESIS_EXAMPLES:
         Boolean(env.GLS_SAVE_GENESIS_EXAMPLES) && env.GLS_SAVE_GENESIS_EXAMPLES !== 'false',
     GLS_NATS_MAX_IN_FLIGHT: Number(env.GLS_NATS_MAX_IN_FLIGHT) || 10,
+    GLS_DB_LOGS_ENABLED: env.GLS_DB_LOGS_ENABLED === 'true',
 };
 
 function parseLocalMetricsEnv() {
