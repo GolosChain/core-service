@@ -60,12 +60,15 @@ class BlockSubscribe extends BasicService {
      *   Имя клиента, предоставляемое серверу, в ином случае берется из env.
      * @param {string} [connectString]
      *   Строка подключения (с авторизацией), в ином случае берется из env.
+     * @param {boolean} [captureProducers]
+     *   Значение `true` расширит блок информацией о продюсере и расписаниях.
      */
     constructor({
         serverName = env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
         clientName = env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
         connectString = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
         handler,
+        captureProducers,
     } = {}) {
         super();
 
@@ -97,6 +100,8 @@ class BlockSubscribe extends BasicService {
             }
             await handler(event);
         });
+
+        this._captureProducers = !!captureProducers;
     }
 
     /**
@@ -456,6 +461,12 @@ class BlockSubscribe extends BasicService {
             transactions,
             counters,
         };
+
+        if (this._captureProducers) {
+            blockData.producer = block.producer;
+            blockData.schedule = block.active_schedule;
+            blockData.nextSchedule = block.next_schedule;
+        }
 
         this._emitBlock(blockData);
         this._completeBlocksQueue.set(blockData.blockNum, blockData);
