@@ -101,7 +101,7 @@ class BlockSubscribe extends BasicService {
             await handler(event);
         });
 
-        this._captureProducers = !!captureProducers;
+        this._captureProducers = Boolean(captureProducers);
     }
 
     /**
