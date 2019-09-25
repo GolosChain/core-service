@@ -33,6 +33,7 @@ module.exports = {
     GLS_NATS_MAX_IN_FLIGHT: Number(env.GLS_NATS_MAX_IN_FLIGHT) || 10,
     GLS_SKIP_MISSING_TRANSACTIONS:
         Boolean(env.GLS_SKIP_MISSING_TRANSACTIONS) && env.GLS_SKIP_MISSING_TRANSACTIONS !== 'false',
+    GLS_DB_LOGS_ENABLED: env.GLS_DB_LOGS_ENABLED === 'true',
 };
 
 function parseLocalMetricsEnv() {
