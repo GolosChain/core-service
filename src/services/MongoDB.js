@@ -45,6 +45,15 @@ class MongoDB extends BasicService {
     }
 
     /**
+     * Получение объекта драйвера, который используется в данном классе.
+     * Необходимо для выполнения операций непосредственно с голым драйвером mongoose
+     * @returns {mongoose}
+     */
+    static get mongoose(){
+        return mongoose
+    }
+
+    /**
      * @deprecated
      * Получение типов схем, необходимо для обозначения особых
      * типов полей для моделей.
@@ -76,9 +85,10 @@ class MongoDB extends BasicService {
      * окружения, либо по явно указанной строке подключеня.
      * @param {string/null} [forceConnectString] Строка подключения,
      * не обязательна.
+     * @param {Object} [options] Настройки подключения к базе.
      * @returns {Promise<*>} Промис без экстра данных.
      */
-    async start(forceConnectString = null) {
+    async start(forceConnectString = null, options = {}) {
         return new Promise(resolve => {
             const connection = mongoose.connection;
 
@@ -92,7 +102,10 @@ class MongoDB extends BasicService {
                 resolve();
             });
 
-            mongoose.connect(forceConnectString || env.GLS_MONGO_CONNECT);
+            mongoose.connect(
+                forceConnectString || env.GLS_MONGO_CONNECT,
+                { useNewUrlParser: true, ...options }
+            );
         });
     }
 

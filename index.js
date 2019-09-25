@@ -11,15 +11,18 @@ const UtilsLogger = require('./src/utils/Logger');
 const UtilsMoments = require('./src/utils/Moments');
 const UtilsTemplate = require('./src/utils/Template');
 const UtilsRpcObject = require('./src/utils/RpcObject');
-const UtilsServiceMeta = require('./src/utils/ServiceMeta');
 const UtilsContent = require('./src/utils/Content');
 const utilsDefaultStarter = require('./src/utils/defaultStarter');
 const UtilsGateClient = require('./src/utils/GateClient');
+const UtilsGenesisProcessor = require('./src/utils/GenesisProcessor');
 const UtilsParallel = require('./src/utils/Parallel');
+const UtilsBulkSaver = require('./src/utils/BulkSaver');
 const UtilsUserRegister = require('./src/utils/UserRegister');
 const utilsMetrics = require('./src/utils/metrics');
 const UtilsParallelPool = require('./src/utils/ParallelPool');
 const utilsWaitForTransaction = require('./src/utils/waitForTransaction');
+const UtilsCyberWayClient = require('./src/utils/CyberWayClient');
+
 const TypesBigNum = require('./src/types/BigNum');
 const TypesMongoBigNum = require('./src/types/MongoBigNum');
 
@@ -42,15 +45,17 @@ module.exports = {
         Moments: UtilsMoments,
         Template: UtilsTemplate,
         RpcObject: UtilsRpcObject,
-        ServiceMeta: UtilsServiceMeta,
         Parallel: UtilsParallel,
         ParallelPool: UtilsParallelPool,
+        BulkSaver: UtilsBulkSaver,
         Content: UtilsContent,
         defaultStarter: utilsDefaultStarter,
         GateClient: UtilsGateClient,
+        GenesisProcessor: UtilsGenesisProcessor,
         metrics: utilsMetrics,
         UserRegister: UtilsUserRegister,
         waitForTransaction: utilsWaitForTransaction,
+        CyberWayClient: UtilsCyberWayClient,
     },
     types: {
         BigNum: TypesBigNum,

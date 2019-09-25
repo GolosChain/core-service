@@ -1,5 +1,4 @@
 const Basic = require('./Basic');
-const ServiceMeta = require('../utils/ServiceMeta');
 const MongoDB = require('../services/MongoDB');
 const Logger = require('../utils/Logger');
 const metrics = require('../utils/metrics');
@@ -32,6 +31,8 @@ class BasicMain extends Basic {
         this.throwOnUnhandledPromiseRejection();
 
         this._startMongoBeforeBoot = false;
+        this._mongoDbForceConnectString = null;
+        this._mongoDbOptions = {};
     }
 
     async start() {
@@ -51,28 +52,30 @@ class BasicMain extends Basic {
     }
 
     /**
-     * Метод установки метаданных микросервиса.
-     * @param {Object} meta Любые необходимые данные (см. utils/ServiceMeta).
+     * @deprecated
      */
-    defineMeta(meta) {
-        for (const key of Object.keys(meta)) {
-            ServiceMeta.set(key, meta[key]);
-        }
+    defineMeta() {
+        Logger.warn('Define meta is deprecated');
     }
 
     /**
      * Подключит и запустит сервис работы
      * с базой данных MongoDB до запуска метода boot.
+     * @param {string/null} [forceConnectString] Строка подключения,
+     * не обязательна.
+     * @param {Object} [options] Настройки подключения.
      */
-    startMongoBeforeBoot() {
+    startMongoBeforeBoot(forceConnectString, options) {
         this._mongoDb = new MongoDB();
         this._startMongoBeforeBoot = true;
+        this._mongoDbForceConnectString = forceConnectString;
+        this._mongoDbOptions = options;
     }
 
     async _tryStartMongoBeforeBoot() {
         if (this._startMongoBeforeBoot) {
             Logger.info(`Start MongoDB...`);
-            await this._mongoDb.start();
+            await this._mongoDb.start(this._mongoDbForceConnectString, this._mongoDbOptions);
             Logger.info(`The MongoDB done!`);
 
             this._tryExcludeMongoFromNested();
