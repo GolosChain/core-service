@@ -2,7 +2,7 @@ require('colors');
 const moment = require('moment');
 const metrics = require('./metrics');
 const env = require('../data/env');
-const LogsModel = require('./LogsModel');
+const LogsModel = require('../models/Log');
 
 /**
  * Логгер действий.
