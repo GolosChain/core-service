@@ -468,8 +468,6 @@ class BlockSubscribe extends BasicService {
 
         this._isRecentSubscribeMode = false;
         this._lastProcessedSequence = block.sequence;
-
-        this._cleanOldTransactions(block.block_num);
     }
 
     _handleBlockCommit(block) {
@@ -514,6 +512,8 @@ class BlockSubscribe extends BasicService {
 
             this._lastEmittedIrreversibleBlockNum = block.blockNum;
         }
+
+        this._cleanOldTransactions();
     }
 
     _emitBlock(block) {
@@ -536,9 +536,13 @@ class BlockSubscribe extends BasicService {
         this._lastEmittedBlockNum = block.blockNum;
     }
 
-    _cleanOldTransactions(lastProcessedBlockNum) {
+    _cleanOldTransactions() {
+        if (!this._lastIrreversibleNum) {
+            return;
+        }
+
         for (const blockNum of this._blockNumTransactions.keys()) {
-            if (blockNum <= lastProcessedBlockNum) {
+            if (blockNum <= this._lastIrreversibleNum) {
                 this._blockNumTransactions.delete(blockNum);
             }
         }
