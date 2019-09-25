@@ -15,7 +15,7 @@ class Logger {
     static log(...args) {
         this._log('[log]', args, 'grey');
         this._writeLogsToDB(args, 'log').catch(error => {
-            console.error('Cannot write logs entry: ', error);
+            console.error('Cannot write logs entry:', error);
         });
     }
 
@@ -25,7 +25,7 @@ class Logger {
     static info(...args) {
         this._log('[info]', args, 'blue');
         this._writeLogsToDB(args, 'info').catch(error => {
-            console.error('Cannot write logs entry: ', error);
+            console.error('Cannot write logs entry:', error);
         });
     }
 
@@ -35,7 +35,7 @@ class Logger {
     static warn(...args) {
         this._log('[warn]', args, 'yellow');
         this._writeLogsToDB(args, 'warn').catch(error => {
-            console.error('Cannot write logs entry: ', error);
+            console.error('Cannot write logs entry:', error);
         });
         metrics.inc('log_warnings');
     }
@@ -45,8 +45,8 @@ class Logger {
      */
     static error(...args) {
         this._log('[error]', args, 'red');
-        this._writeLogsToDB(args, 'erroe').catch(error => {
-            console.error('Cannot write logs entry: ', error);
+        this._writeLogsToDB(args, 'error').catch(error => {
+            console.error('Cannot write logs entry:', error);
         });
         metrics.inc('log_errors');
     }
@@ -64,7 +64,7 @@ class Logger {
             return;
         }
         const entryStrings = [];
-        for (const originalEntry in args) {
+        for (const originalEntry of args) {
             if (['string', 'number', 'boolean'].includes(typeof originalEntry)) {
                 entryStrings.push(String(originalEntry));
             } else {
