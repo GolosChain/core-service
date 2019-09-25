@@ -421,7 +421,10 @@ class BlockSubscribe extends BasicService {
 
             if (!trx) {
                 Logger.error(`Transaction (${trxMeta.id}) is not found in ApplyTrx feed`);
-                process.exit(1);
+
+                if (!env.GLS_SKIP_MISSING_TRANSACTIONS) {
+                    process.exit(1);
+                }
             }
 
             const stats = { ...trxMeta };
