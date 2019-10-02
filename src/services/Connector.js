@@ -265,7 +265,7 @@ class Connector extends BasicService {
     async callService(service, method, params, auth) {
         const response = await this.sendTo(service, method, {
             ...params,
-            __auth: auth,
+            __auth: this._normalizeAuth(auth),
         });
 
         if (response.error) {
@@ -328,6 +328,22 @@ class Connector extends BasicService {
      */
     disableEmptyResponseCorrection() {
         this._useEmptyResponseCorrection = false;
+    }
+
+    _normalizeAuth(auth) {
+        if (!auth) {
+            return undefined;
+        }
+
+        if (auth.user) {
+            return {
+                ...auth,
+                userId: auth.user,
+                user: undefined,
+            };
+        }
+
+        return auth;
     }
 
     _startServer(rawRoutes, serverDefaults) {
