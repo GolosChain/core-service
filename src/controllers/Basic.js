@@ -60,11 +60,12 @@ class Basic {
      * @param {string} service Имя-алиас микросервиса.
      * @param {string} method Метод JSON-RPC.
      * @param {Object} params Параметры запроса.
+     * @param {Object} [auth] Параметры Gate-авторизации (опциональный).
      * @returns {Promise<*>} Ответ.
      */
-    async callService(service, method, params) {
+    async callService(service, method, params, auth) {
         if (this.connector) {
-            return await this.connector.callService(service, method, params);
+            return await this.connector.callService(service, method, params, auth);
         } else {
             Logger.error('Basic controller - connector not defined');
             console.trace();
