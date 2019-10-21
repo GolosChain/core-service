@@ -37,8 +37,26 @@ class Logger {
         metrics.inc('log_errors');
     }
 
-    static _log(prefix, data, color) {
-        console.log(...[this._now(), `<${process.pid}>`, prefix[color], ...data]);
+    static _log(prefix, args, color) {
+        const newArgs = args.map(arg => {
+            if (!arg) {
+                return arg;
+            }
+
+            const type = typeof arg;
+
+            if (type !== 'object') {
+                return arg;
+            }
+
+            if (arg instanceof Error) {
+                return arg;
+            }
+
+            return JSON.stringify(arg, null, 2);
+        });
+
+        console.log(...[this._now(), `<${process.pid}>`, prefix[color], ...newArgs]);
     }
 
     static _now() {
