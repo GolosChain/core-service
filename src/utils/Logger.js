@@ -53,7 +53,18 @@ class Logger {
                 return arg;
             }
 
-            return JSON.stringify(arg, null, 2);
+            // try/catch для того чтобы такие ошибки как циклически вложенные объекты и т.д. не ломали логирование.
+            try {
+                const json = JSON.stringify(arg, null, 2);
+
+                if (json.length > 1000) {
+                    return json.substr(0, 1000) + ' ...';
+                }
+
+                return json;
+            } catch {}
+
+            return arg;
         });
 
         console.log(...[this._now(), `<${process.pid}>`, prefix[color], ...newArgs]);
