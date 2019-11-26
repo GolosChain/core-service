@@ -542,7 +542,7 @@ class Connector extends BasicService {
                 }
 
                 if (typeof originHandler === 'function') {
-                    data = await originHandler(params, auth);
+                    data = await originHandler(params, auth, clientInfo);
                 } else {
                     data = await this._handleWithOptions(originHandler, params, auth, clientInfo);
                 }
@@ -566,7 +566,7 @@ class Connector extends BasicService {
         };
     }
 
-    async _handleWithOptions(config, params, auth) {
+    async _handleWithOptions(config, params, auth, clientInfo) {
         let { handler: originalHandler, scope, validator, before, after } = config;
 
         before = before || [];
@@ -584,7 +584,7 @@ class Connector extends BasicService {
         let currentData = params;
 
         for (const { handler, scope } of queue) {
-            const resultData = await handler.call(scope || null, currentData, auth);
+            const resultData = await handler.call(scope || null, currentData, auth, clientInfo);
 
             if (resultData !== undefined || handler === originalHandler) {
                 currentData = resultData;
