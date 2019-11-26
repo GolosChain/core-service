@@ -262,10 +262,11 @@ class Connector extends BasicService {
      * @param {Object} [auth] Параметры Gate-авторизации (опциональный).
      * @returns {Promise<*>} Ответ.
      */
-    async callService(service, method, params, auth) {
+    async callService(service, method, params, auth, clientInfo) {
         const response = await this.sendTo(service, method, {
             ...params,
             __auth: this._normalizeAuth(auth),
+            __clientInfo: clientInfo,
         });
 
         if (response.error) {
@@ -529,16 +530,21 @@ class Connector extends BasicService {
 
             try {
                 const auth = params.__auth || {};
+                const clientInfo = params.__clientInfo || {};
                 let data;
 
                 if (params.__auth) {
                     delete params.__auth;
                 }
 
+                if (params.__clientInfo) {
+                    delete params.__clientInfo;
+                }
+
                 if (typeof originHandler === 'function') {
                     data = await originHandler(params, auth);
                 } else {
-                    data = await this._handleWithOptions(originHandler, params, auth);
+                    data = await this._handleWithOptions(originHandler, params, auth, clientInfo);
                 }
 
                 if (this._useEmptyResponseCorrection && (!data || data === 'Ok')) {

@@ -61,11 +61,12 @@ class Basic {
      * @param {string} method Метод JSON-RPC.
      * @param {Object} params Параметры запроса.
      * @param {Object} [auth] Параметры Gate-авторизации (опциональный).
+     * @param {Object} [clientInfo] Параметры Gate-конфиграции клиента (опциональный).
      * @returns {Promise<*>} Ответ.
      */
-    async callService(service, method, params, auth) {
+    async callService(service, method, params, auth, clientInfo) {
         if (this.connector) {
-            return await this.connector.callService(service, method, params, auth);
+            return await this.connector.callService(service, method, params, auth, clientInfo);
         } else {
             Logger.error('Basic controller - connector not defined');
             console.trace();
