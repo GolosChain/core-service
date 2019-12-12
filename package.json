@@ -1,6 +1,6 @@
 {
   "name": "cyberway-core-service",
-  "version": "3.54.3",
+  "version": "3.54.4",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -23,7 +23,7 @@
     "jayson": "^2.1.2",
     "lodash.template": "^4.5.0",
     "moment": "^2.24.0",
-    "mongoose": "^5.6.6",
+    "mongoose": "^5.7.5",
     "node-fetch": "^2.6.0",
     "node-nats-streaming": "^0.2.6",
     "prom-client": "^11.5.3",
