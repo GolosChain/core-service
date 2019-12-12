@@ -1,6 +1,6 @@
 {
   "name": "cyberway-core-service",
-  "version": "3.54.4",
+  "version": "3.55.3",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -33,25 +33,7 @@
     "then-sleep": "^1.0.1",
     "ws": "^5.2.2"
   },
-  "prettier": {
-    "singleQuote": true,
-    "tabWidth": 4,
-    "semi": true,
-    "trailingComma": "es5",
-    "printWidth": 100,
-    "overrides": [
-      {
-        "files": [
-          "*.json",
-          "*.yml"
-        ],
-        "options": {
-          "tabWidth": 2
-        }
-      }
-    ]
-  },
   "devDependencies": {
-    "prettier": "^1.18.2"
+    "prettier": "^1.19.1"
   }
 }

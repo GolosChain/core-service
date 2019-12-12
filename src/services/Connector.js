@@ -262,10 +262,11 @@ class Connector extends BasicService {
      * @param {Object} [auth] Параметры Gate-авторизации (опциональный).
      * @returns {Promise<*>} Ответ.
      */
-    async callService(service, method, params, auth) {
+    async callService(service, method, params, auth, clientInfo) {
         const response = await this.sendTo(service, method, {
             ...params,
             __auth: this._normalizeAuth(auth),
+            __clientInfo: clientInfo,
         });
 
         if (response.error) {
@@ -529,16 +530,21 @@ class Connector extends BasicService {
 
             try {
                 const auth = params.__auth || {};
+                const clientInfo = params.__clientInfo || {};
                 let data;
 
                 if (params.__auth) {
                     delete params.__auth;
                 }
 
+                if (params.__clientInfo) {
+                    delete params.__clientInfo;
+                }
+
                 if (typeof originHandler === 'function') {
-                    data = await originHandler(params, auth);
+                    data = await originHandler(params, auth, clientInfo);
                 } else {
-                    data = await this._handleWithOptions(originHandler, params, auth);
+                    data = await this._handleWithOptions(originHandler, params, auth, clientInfo);
                 }
 
                 if (this._useEmptyResponseCorrection && (!data || data === 'Ok')) {
@@ -560,7 +566,7 @@ class Connector extends BasicService {
         };
     }
 
-    async _handleWithOptions(config, params, auth) {
+    async _handleWithOptions(config, params, auth, clientInfo) {
         let { handler: originalHandler, scope, validator, before, after } = config;
 
         before = before || [];
@@ -578,7 +584,7 @@ class Connector extends BasicService {
         let currentData = params;
 
         for (const { handler, scope } of queue) {
-            const resultData = await handler.call(scope || null, currentData, auth);
+            const resultData = await handler.call(scope || null, currentData, auth, clientInfo);
 
             if (resultData !== undefined || handler === originalHandler) {
                 currentData = resultData;

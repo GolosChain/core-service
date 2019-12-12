@@ -370,7 +370,7 @@ class BlockSubscribe extends BasicService {
     _handleTransactionApply(transaction) {
         metrics.inc('core_trx_apply');
 
-        if (this._lastBlockNum && this._lastBlockNum >= transaction.block_num) {
+        if (this._lastIrreversibleNum && this._lastIrreversibleNum >= transaction.block_num) {
             return;
         }
 
