@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
-const BasicService = require('./Basic');
+const Service = require('./Service');
 const metrics = require('../utils/metrics');
 
 /**
@@ -9,7 +9,7 @@ const metrics = require('../utils/metrics');
  * Содержит методы для подключения к базе данных,
  * а также обертку для создания моделей формата Mongoose.Schema.
  */
-class MongoDB extends BasicService {
+class MongoDB extends Service {
     /**
      * Создание модели по объекту-конфигу.
      * Дополнительно вторым аргументом можно указать конфиг,
@@ -49,8 +49,8 @@ class MongoDB extends BasicService {
      * Необходимо для выполнения операций непосредственно с голым драйвером mongoose
      * @returns {mongoose}
      */
-    static get mongoose(){
-        return mongoose
+    static get mongoose() {
+        return mongoose;
     }
 
     /**
@@ -102,10 +102,10 @@ class MongoDB extends BasicService {
                 resolve();
             });
 
-            mongoose.connect(
-                forceConnectString || env.GLS_MONGO_CONNECT,
-                { useNewUrlParser: true, ...options }
-            );
+            mongoose.connect(forceConnectString || env.GLS_MONGO_CONNECT, {
+                useNewUrlParser: true,
+                ...options,
+            });
         });
     }
 
