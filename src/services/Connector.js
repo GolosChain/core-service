@@ -590,7 +590,17 @@ class Connector extends Service {
         const queue = [...before, { handler: originalHandler, scope }, ...after];
         let currentData = params;
 
-        for (const { handler, scope } of queue) {
+        for (const check of queue) {
+            let handler;
+            let scope = null;
+
+            if (typeof check === 'function') {
+                handler = check;
+            } else {
+                handler = check.handler;
+                scope = check.scope;
+            }
+
             const resultData = await handler.call(scope || null, currentData, auth, clientInfo);
 
             if (resultData !== undefined || handler === originalHandler) {
