@@ -1,11 +1,10 @@
-// Help for IDE class linking
-const ControllersBasic = require('./src/controllers/Basic');
+const Controller = require('./src/controllers/Controller');
 
-const ServicesBasic = require('./src/services/Basic');
-const ServicesBasicMain = require('./src/services/BasicMain');
-const ServicesBlockSubscribe = require('./src/services/BlockSubscribe');
-const ServicesMongoDB = require('./src/services/MongoDB');
-const ServicesConnector = require('./src/services/Connector');
+const Service = require('./src/services/Service');
+const BasicMainService = require('./src/services/BasicMain');
+const MongoDBService = require('./src/services/MongoDB');
+const ConnectorService = require('./src/services/Connector');
+const BlockSubscribe = require('./src/services/BlockSubscribe');
 
 const UtilsLogger = require('./src/utils/Logger');
 const UtilsMoments = require('./src/utils/Moments');
@@ -31,14 +30,16 @@ const dataEnv = require('./src/data/env');
 // Export public classes
 module.exports = {
     controllers: {
-        Basic: ControllersBasic,
+        Controller,
+        Basic: Controller, // For backward compatibility
     },
     services: {
-        Basic: ServicesBasic,
-        BasicMain: ServicesBasicMain,
-        BlockSubscribe: ServicesBlockSubscribe,
-        MongoDB: ServicesMongoDB,
-        Connector: ServicesConnector,
+        Service,
+        Basic: Service, // For backward compatibility
+        BasicMain: BasicMainService,
+        BlockSubscribe,
+        MongoDB: MongoDBService,
+        Connector: ConnectorService,
     },
     utils: {
         Logger: UtilsLogger,

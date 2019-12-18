@@ -47,7 +47,7 @@ const env = require('../data/env');
  * Для удобства есть возможность указывать
  * асинхронную логику запуска в методе boot.
  */
-class Basic {
+class Service {
     constructor() {
         this._nestedServices = [];
         this._done = false;
@@ -119,7 +119,7 @@ class Basic {
 
     /**
      * Добавляет сервисы в зависимость к этому сервису.
-     * @param {Basic} services Сервисы.
+     * @param {Service} services Сервисы.
      */
     addNested(...services) {
         this._nestedServices.push(...services);
@@ -300,4 +300,4 @@ class Basic {
     }
 }
 
-module.exports = Basic;
+module.exports = Service;

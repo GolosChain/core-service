@@ -9,7 +9,7 @@ const Logger = require('../utils/Logger');
  * проксируя вызов через себя, который позволяет общаться
  * с другими микросервисами.
  */
-class Basic {
+class Controller {
     /**
      * Конструктор
      * @param {Object} [options] Настройки контроллера.
@@ -75,4 +75,4 @@ class Basic {
     }
 }
 
-module.exports = Basic;
+module.exports = Controller;

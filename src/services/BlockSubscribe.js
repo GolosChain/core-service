@@ -1,5 +1,5 @@
 const nats = require('node-nats-streaming');
-const BasicService = require('./Basic');
+const Service = require('./Service');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const ParallelUtils = require('../utils/Parallel');
@@ -23,7 +23,7 @@ const EVENT_TYPES = {
  * можно что-то записать и из неё что-то прочитать,
  * утилита хранит в базе свои метаданные.
  */
-class BlockSubscribe extends BasicService {
+class BlockSubscribe extends Service {
     /**
      * Структура блока.
      * @typedef Block
@@ -262,9 +262,7 @@ class BlockSubscribe extends BasicService {
                 if (this._waitForFirstEvent) {
                     if (this._subscribeSeq && this._subscribeSeq !== sequence) {
                         Logger.error(
-                            `Received sequence doesn't match to subscribe sequence, subscribe: ${
-                                this._subscribeSeq
-                            }, received: ${sequence}`
+                            `Received sequence doesn't match to subscribe sequence, subscribe: ${this._subscribeSeq}, received: ${sequence}`
                         );
                         process.exit(1);
                     }
@@ -507,9 +505,7 @@ class BlockSubscribe extends BasicService {
 
             if (!block) {
                 Logger.error(
-                    `Irreversible block (${blockNum}) is not found in queue, irreversible block num: ${
-                        this._lastIrreversibleNum
-                    }`
+                    `Irreversible block (${blockNum}) is not found in queue, irreversible block num: ${this._lastIrreversibleNum}`
                 );
                 process.exit(1);
             }

@@ -1,4 +1,4 @@
-const Basic = require('./Basic');
+const Service = require('./Service');
 const MongoDB = require('../services/MongoDB');
 const Logger = require('../utils/Logger');
 const metrics = require('../utils/metrics');
@@ -19,7 +19,7 @@ const metrics = require('../utils/metrics');
  * Метод boot запускается автоматически на старте,
  * перед запуском вложенных сервисаов.
  */
-class BasicMain extends Basic {
+class BasicMain extends Service {
     constructor(env = null) {
         super();
 

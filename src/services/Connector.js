@@ -4,7 +4,7 @@ const ajv = new Ajv({ useDefaults: true });
 const jayson = require('jayson');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
-const BasicService = require('./Basic');
+const Service = require('./Service');
 const metrics = require('../utils/metrics');
 
 /**
@@ -179,7 +179,7 @@ const metrics = require('../utils/metrics');
  *
  * Либо можно добавлять их динамически через метод `addService`.
  */
-class Connector extends BasicService {
+class Connector extends Service {
     /**
      * @param {string} [host] Адрес подключения, иначе возьмется из GLS_CONNECTOR_HOST.
      * @param {number} [port] Порт подключения, иначе возьмется из GLS_CONNECTOR_PORT.
