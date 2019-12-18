@@ -7,6 +7,8 @@ const Logger = require('../utils/Logger');
 const Service = require('./Service');
 const metrics = require('../utils/metrics');
 
+class UnauthorizedError extends Error {}
+
 /**
  * Сервис связи между микросервисами.
  * При необходимости поднимает сервер обработки входящих подключений и/или
@@ -260,6 +262,7 @@ class Connector extends Service {
      * @param {string} method Метод JSON-RPC.
      * @param {Object} params Параметры запроса.
      * @param {Object} [auth] Параметры Gate-авторизации (опциональный).
+     * @param {Object} [clientInfo] Параметры клиента (опциональный).
      * @returns {Promise<*>} Ответ.
      */
     async callService(service, method, params, auth, clientInfo) {
@@ -528,10 +531,16 @@ class Connector extends Service {
             const startTs = Date.now();
             let isError = false;
 
+            console.log('a', { route, originHandler });
+
             try {
                 const auth = params.__auth || {};
                 const clientInfo = params.__clientInfo || {};
                 let data;
+
+                if (originHandler.requireAuth && !auth.userId) {
+                    throw new UnauthorizedError();
+                }
 
                 if (params.__auth) {
                     delete params.__auth;
@@ -622,6 +631,11 @@ class Connector extends Service {
     }
 
     _handleHandlerError(callback, error) {
+        if (error instanceof UnauthorizedError) {
+            callback({ code: 401, message: 'Unauthorized' }, null);
+            return;
+        }
+
         for (const InternalErrorType of [
             EvalError,
             RangeError,
