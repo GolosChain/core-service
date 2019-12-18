@@ -531,8 +531,6 @@ class Connector extends Service {
             const startTs = Date.now();
             let isError = false;
 
-            console.log('a', { route, originHandler });
-
             try {
                 const auth = params.__auth || {};
                 const clientInfo = params.__clientInfo || {};
