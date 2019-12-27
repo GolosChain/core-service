@@ -163,7 +163,7 @@ class BlockSubscribe extends Service {
             return;
         }
 
-        await Model.updateOne({}, { $set: update });
+        await Model.updateOne({}, { $set: update }, { upsert: true });
     }
 
     async _initMetadata() {
