@@ -1,7 +1,25 @@
 // Описание переменных окружения смотри в Readme.
 const env = process.env;
 
+const DEFAULT_NATS_NODE_ID = '_';
+
+let natsConnect;
+
+if (env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT) {
+    const connectEnv = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT;
+
+    // If legacy single node format
+    if (connectEnv.startsWith('nats://')) {
+        natsConnect = {
+            [DEFAULT_NATS_NODE_ID]: connectEnv,
+        };
+    } else {
+        natsConnect = JSON.parse(connectEnv);
+    }
+}
+
 module.exports = {
+    DEFAULT_NATS_NODE_ID,
     GLS_MONGO_CONNECT: env.GLS_MONGO_CONNECT || 'mongodb://mongo/admin',
     GLS_DAY_START: Number(env.GLS_DAY_START) || 3,
     GLS_METRICS_HOST: env.GLS_METRICS_HOST || '127.0.0.1',
@@ -10,7 +28,7 @@ module.exports = {
     GLS_CONNECTOR_PORT: Number(env.GLS_CONNECTOR_PORT) || 3000,
     GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME: env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
     GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME: env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
-    GLS_BLOCKCHAIN_BROADCASTER_CONNECT: env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
+    GLS_BLOCKCHAIN_BROADCASTER_CONNECT: natsConnect,
     GLS_BLOCK_SUBSCRIBER_REPLAY_TIME_DELTA:
         Number(env.GLS_BLOCK_SUBSCRIBER_REPLAY_TIME_DELTA) || 600000,
     GLS_BLOCK_SUBSCRIBER_CLEANER_INTERVAL:
