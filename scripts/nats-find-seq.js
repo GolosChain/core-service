@@ -1,3 +1,12 @@
+/**
+ * Example of calling:
+ *
+ * $ node nats-find-seq.js '{"connectString":"nats://correct-connect-url","blockId":"002cac32139429f74439613642723fe5d1bec5d2ae055ad9246ee387379f7e2c","blockNum":2927666}'
+ *
+ * Results:
+ * {"sequence":36556495}
+ */
+
 const { connect, findBlockSeq, findLastIrreversibleBlockAcceptBefore } = require('nats-queue-sync');
 
 async function main() {
