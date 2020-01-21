@@ -6,7 +6,9 @@ async function main() {
     const { connectString, blockId, blockNum } = JSON.parse(json);
 
     if (!connectString || !blockId || !blockNum) {
-        console.error('Invalid arguments');
+        console.error(
+            'One of required startup arguments is missing: connectString, blockId, blockNum'
+        );
         process.exit(1);
     }
 

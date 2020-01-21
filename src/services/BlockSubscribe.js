@@ -426,7 +426,7 @@ class BlockSubscribe extends Service {
             }
 
             this._noMessagesReconnect++;
-            this._onConnectionError(new Error('No messages timeout'));
+            this._onConnectionError(new Error('Timeout: no new messages'));
         }
     }
 
