@@ -52,6 +52,7 @@ module.exports = {
     GLS_SKIP_MISSING_TRANSACTIONS:
         Boolean(env.GLS_SKIP_MISSING_TRANSACTIONS) && env.GLS_SKIP_MISSING_TRANSACTIONS !== 'false',
     GLS_DB_LOGS_ENABLED: env.GLS_DB_LOGS_ENABLED === 'true',
+    GLS_SLACK_ALERT_WEB_HOOK: env.GLS_SLACK_ALERT_WEB_HOOK,
 };
 
 function parseLocalMetricsEnv() {

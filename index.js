@@ -26,6 +26,7 @@ const TypesBigNum = require('./src/types/BigNum');
 const TypesMongoBigNum = require('./src/types/MongoBigNum');
 
 const dataEnv = require('./src/data/env');
+const globalData = require('./src/data/data');
 
 // Export public classes
 module.exports = {
@@ -64,5 +65,8 @@ module.exports = {
     },
     data: {
         env: dataEnv,
+    },
+    setServiceName(serviceName) {
+        globalData.serviceName = serviceName;
     },
 };

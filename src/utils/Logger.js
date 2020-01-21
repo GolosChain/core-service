@@ -11,7 +11,7 @@ class Logger {
      * Залогировать обычное действие.
      */
     static log(...args) {
-        this._log('[log]', args, 'grey');
+        this._log('[log ]', args, 'grey');
     }
 
     /**
@@ -33,7 +33,7 @@ class Logger {
      * Залогировать ошибку.
      */
     static error(...args) {
-        this._log('[error]', args, 'red');
+        this._log('[err ]', args, 'red');
         metrics.inc('log_errors');
     }
 

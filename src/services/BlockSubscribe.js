@@ -1,8 +1,10 @@
 const path = require('path');
 const child = require('child_process');
 const nats = require('node-nats-streaming');
+const fetch = require('node-fetch');
 const Service = require('./Service');
 const env = require('../data/env');
+const globalData = require('../data/data');
 const Logger = require('../utils/Logger');
 const ParallelUtils = require('../utils/Parallel');
 const metrics = require('../utils/metrics');
@@ -16,7 +18,7 @@ const EVENT_TYPES = {
 
 const RECONNECT_DELAY = 10 * 1000;
 const SWITCH_NODE_DELAY = 10 * 60 * 1000;
-const CHECK_ACTIVITY_EVERY = 60 * 1000;
+const CHECK_ACTIVITY_EVERY = 30 * 1000;
 const NO_MESSAGES_RECONNECT_TIMEOUT = 2 * 60 * 1000;
 
 /**
@@ -429,6 +431,8 @@ class BlockSubscribe extends Service {
     }
 
     async _tryToSwitchNode() {
+        const currentNodeId = this._nodeId;
+
         const targetNodeId = this._chooseNewNodeId();
 
         if (!targetNodeId) {
@@ -441,6 +445,8 @@ class BlockSubscribe extends Service {
         if (!(await this._switchNode(targetNodeId))) {
             return false;
         }
+
+        this._sendAlert({ currentNodeId, targetNodeId });
 
         this._resetState();
         await this._extractMetaData();
@@ -852,6 +858,60 @@ class BlockSubscribe extends Service {
                 },
             }
         );
+    }
+
+    async _sendAlert({ currentNodeId, targetNodeId }) {
+        if (!env.GLS_SLACK_ALERT_WEB_HOOK) {
+            return;
+        }
+
+        try {
+            const currentNode = this._extractNodeHost(currentNodeId);
+            const targetNode = this._extractNodeHost(targetNodeId);
+
+            const data = {
+                text: `Service "${globalData.serviceName || 'unknown'}"`,
+                attachments: [
+                    {
+                        color: 'warning',
+                        title: 'Nats node have been switched',
+                        text: `to "${targetNode}" from "${currentNode}"`,
+                        ts: Date.now(),
+                    },
+                ],
+            };
+
+            const response = await fetch(env.GLS_SLACK_ALERT_WEB_HOOK, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Request failed: ${response.status}, ${response.statusText}`);
+            }
+        } catch (err) {
+            Logger.warn('Sending slack alert failed:', err);
+        }
+    }
+
+    _extractNodeHost(nodeId) {
+        if (!nodeId) {
+            return 'N/A';
+        }
+
+        const connectString = this._natsConnect[nodeId] || '';
+
+        const match = connectString.match(/^nats:\/\/[^@]+@(.+)$/);
+
+        if (!match) {
+            return `${nodeId} (address: N/A)`;
+        }
+
+        return `${nodeId}: ${match[1]}`;
     }
 }
 
