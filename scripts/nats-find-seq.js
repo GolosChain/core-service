@@ -28,11 +28,7 @@ async function main() {
 async function run(stan, irrBlock) {
     const found = await findBlockSeq(stan, irrBlock);
 
-    // console.log('Irr block found:', cutBlock(found));
-
     const foundAccept = await findLastIrreversibleBlockAcceptBefore(stan, found);
-
-    // console.log('Accept Irr block found:', cutBlock(foundAccept));
 
     console.log(JSON.stringify({ sequence: foundAccept.sequence }));
 }

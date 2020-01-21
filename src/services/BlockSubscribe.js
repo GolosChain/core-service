@@ -129,7 +129,7 @@ class BlockSubscribe extends Service {
         this._blockNumTransactions = new Map();
         this._completeBlocksQueue = new Map();
         this._waitForFirstEvent = true;
-        this._lastIrreversibleNum = null;
+        this._lastIrreversibleBlockNum = null;
         this._lastEmittedBlockNum = null;
         this._lastEmittedIrreversibleBlockNum = null;
         this._ignoreSequencesLess = null;
@@ -255,7 +255,7 @@ class BlockSubscribe extends Service {
         // If first run (no nodeId saved).
         if (!this._nodeId) {
             Logger.info('Set nats node id to:', firstNodeId);
-            this._updateMeta({
+            await this._updateMeta({
                 nodeId: firstNodeId,
             });
             this._nodeId = firstNodeId;
@@ -635,7 +635,10 @@ class BlockSubscribe extends Service {
     _handleTransactionApply(transaction) {
         metrics.inc('core_trx_apply');
 
-        if (this._lastIrreversibleNum && this._lastIrreversibleNum >= transaction.block_num) {
+        if (
+            this._lastIrreversibleBlockNum &&
+            this._lastIrreversibleBlockNum >= transaction.block_num
+        ) {
             return;
         }
 
@@ -749,7 +752,7 @@ class BlockSubscribe extends Service {
     _handleBlockCommit(block) {
         metrics.inc('core_block_commit');
 
-        this._lastIrreversibleNum = block.block_num;
+        this._lastIrreversibleBlockNum = block.block_num;
 
         this._processIrreversibleBlocks();
     }
@@ -767,12 +770,12 @@ class BlockSubscribe extends Service {
             startBlockNum = Math.min(...this._completeBlocksQueue.keys());
         }
 
-        for (let blockNum = startBlockNum; blockNum <= this._lastIrreversibleNum; blockNum++) {
+        for (let blockNum = startBlockNum; blockNum <= this._lastIrreversibleBlockNum; blockNum++) {
             const block = this._completeBlocksQueue.get(blockNum);
 
             if (!block) {
                 Logger.error(
-                    `Irreversible block (${blockNum}) is not found in queue, irreversible block num: ${this._lastIrreversibleNum}`
+                    `Irreversible block (${blockNum}) is not found in queue, irreversible block num: ${this._lastIrreversibleBlockNum}`
                 );
                 process.exit(1);
             }
@@ -782,7 +785,7 @@ class BlockSubscribe extends Service {
             this._handler({
                 type: EVENT_TYPES.IRREVERSIBLE_BLOCK,
                 data: block,
-                isRealIrreversible: blockNum === this._lastIrreversibleNum,
+                isRealIrreversible: blockNum === this._lastIrreversibleBlockNum,
             });
 
             this._lastEmittedIrreversibleBlockNum = block.blockNum;
@@ -812,12 +815,12 @@ class BlockSubscribe extends Service {
     }
 
     _cleanOldTransactions() {
-        if (!this._lastIrreversibleNum) {
+        if (!this._lastIrreversibleBlockNum) {
             return;
         }
 
         for (const blockNum of this._blockNumTransactions.keys()) {
-            if (blockNum <= this._lastIrreversibleNum) {
+            if (blockNum <= this._lastIrreversibleBlockNum) {
                 this._blockNumTransactions.delete(blockNum);
             }
         }

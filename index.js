@@ -66,7 +66,4 @@ module.exports = {
     data: {
         env: dataEnv,
     },
-    setServiceName(serviceName) {
-        globalData.serviceName = serviceName;
-    },
 };
