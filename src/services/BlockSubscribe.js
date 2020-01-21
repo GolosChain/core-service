@@ -15,14 +15,14 @@ const EVENT_TYPES = {
 };
 
 const RECONNECT_DELAY = 10 * 1000;
-const SWITCH_NODE_DELAY = 1 * 60 * 1000;
+const SWITCH_NODE_DELAY = 10 * 60 * 1000;
 const CHECK_ACTIVITY_EVERY = 60 * 1000;
 const NO_MESSAGES_RECONNECT_TIMEOUT = 2 * 60 * 1000;
 
 /**
  * Сервис подписки получения новых блоков.
  * Подписывается на рассылку блоков от CyberWay-ноды.
- * Каждый полученный блок сериализуется и передается в обработчик handle,
+ * Каждый полученный блок десериализуется и передается в обработчик handle,
  * также этот метод гарантирует последовательное поступление блоков.
  * Колбек вызвается через await.
  *
@@ -84,6 +84,8 @@ class BlockSubscribe extends Service {
         this._natsConnect = natsConnect;
         this._captureProducers = Boolean(captureProducers);
 
+        this._noMessagesReconnect = 0;
+
         this._resetState();
 
         this._onConnectionConnect = this._onConnectionConnect.bind(this);
@@ -131,7 +133,6 @@ class BlockSubscribe extends Service {
         this._ignoreSequencesLess = null;
         this._subscribedAt = null;
         this._lastMessageReceivedAt = null;
-        this._noMessagesReconnect = 0;
         this._connectionErrors = 0;
     }
 
@@ -262,7 +263,10 @@ class BlockSubscribe extends Service {
         const connectString = this._natsConnect[this._nodeId];
 
         if (!connectString) {
-            await this._switchNode(firstNodeId);
+            if (!(await this._switchNode(firstNodeId))) {
+                Logger.error('Critical: Node switch failed');
+                process.exit(1);
+            }
         }
     }
 
@@ -282,11 +286,18 @@ class BlockSubscribe extends Service {
                 lastIrrBlockNum,
             });
 
-            const seq = await this._findIrreversibleBlockInNats(
-                targetNodeId,
-                lastIrrBlockId,
-                lastIrrBlockNum
-            );
+            let seq = null;
+
+            try {
+                seq = await this._findIrreversibleBlockInNats(
+                    targetNodeId,
+                    lastIrrBlockId,
+                    lastIrrBlockNum
+                );
+            } catch (err) {
+                Logger.warn('findIrreversibleBlockInNats failed:', err);
+                return false;
+            }
 
             Logger.info(`Sequence on new node (${targetNodeId}) found:`, seq);
 
@@ -311,6 +322,8 @@ class BlockSubscribe extends Service {
         }
 
         await this._extractMetaData();
+
+        return true;
     }
 
     async _findIrreversibleBlockInNats(nodeId, irrBlockId, irrBlockNum) {
@@ -418,20 +431,23 @@ class BlockSubscribe extends Service {
     async _tryToSwitchNode() {
         const targetNodeId = this._chooseNewNodeId();
 
-        if (targetNodeId) {
-            if (this._connection) {
-                this._unsubscribe();
-            }
-            await this._waitQueueEmpty();
-            await this._switchNode(targetNodeId);
-            this._resetState();
-            await this._extractMetaData();
-            this._connectToMessageBroker();
-
-            return true;
+        if (!targetNodeId) {
+            return false;
         }
 
-        return false;
+        this._unsubscribe();
+        await this._waitQueueEmpty();
+
+        if (!(await this._switchNode(targetNodeId))) {
+            return false;
+        }
+
+        this._resetState();
+        await this._extractMetaData();
+
+        this._connectToMessageBroker();
+
+        return true;
     }
 
     _waitQueueEmpty() {
@@ -552,13 +568,15 @@ class BlockSubscribe extends Service {
     _unsubscribe() {
         clearInterval(this._eventMonitoringInterval);
 
-        this._connection.removeListener('connect', this._onConnectionConnect);
-        this._connection.removeListener('close', this._onConnectionClose);
-        this._connection.removeListener('error', this._onConnectionError);
+        if (this._connection) {
+            this._connection.removeListener('connect', this._onConnectionConnect);
+            this._connection.removeListener('close', this._onConnectionClose);
+            this._connection.removeListener('error', this._onConnectionError);
 
-        // Вешаем пустой обработчик ошибки на отключаемое соединение,
-        // чтобы случайные ошибки из закрываемого соединения не убили приложение.
-        this._connection.on('error', () => {});
+            // Вешаем пустой обработчик ошибки на отключаемое соединение,
+            // чтобы случайные ошибки из закрываемого соединения не убили приложение.
+            this._connection.on('error', () => {});
+        }
 
         if (this._subscriber) {
             const { subscriber, handler } = this._subscriber;
