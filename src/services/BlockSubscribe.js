@@ -16,10 +16,11 @@ const EVENT_TYPES = {
     FORK: 'FORK',
 };
 
-const RECONNECT_DELAY = 10 * 1000;
-const SWITCH_NODE_DELAY = 10 * 60 * 1000;
 const CHECK_ACTIVITY_EVERY = 30 * 1000;
+const RECONNECT_DELAY = 10 * 1000;
+const RECONNECT_RETRY_LIMIT = 30;
 const NO_MESSAGES_RECONNECT_TIMEOUT = 2 * 60 * 1000;
+const NO_MESSAGES_RECONNECT_RETRY_LIMIT = 5;
 
 /**
  * Сервис подписки получения новых блоков.
@@ -405,7 +406,7 @@ class BlockSubscribe extends Service {
 
         this._connectionErrors++;
 
-        if (this._connectionErrors > SWITCH_NODE_DELAY / RECONNECT_DELAY) {
+        if (this._connectionErrors >= RECONNECT_RETRY_LIMIT) {
             if (await this._tryToSwitchNode()) {
                 return;
             }
@@ -419,7 +420,7 @@ class BlockSubscribe extends Service {
         const lastActivity = this._lastMessageReceivedAt || this._subscribedAt;
 
         if (lastActivity && lastActivity < Date.now() - NO_MESSAGES_RECONNECT_TIMEOUT) {
-            if (this._noMessagesReconnect >= SWITCH_NODE_DELAY / NO_MESSAGES_RECONNECT_TIMEOUT) {
+            if (this._noMessagesReconnect >= NO_MESSAGES_RECONNECT_RETRY_LIMIT) {
                 if (await this._tryToSwitchNode()) {
                     return;
                 }
