@@ -1,13 +1,12 @@
 const path = require('path');
 const child = require('child_process');
 const nats = require('node-nats-streaming');
-const fetch = require('node-fetch');
 const Service = require('./Service');
 const env = require('../data/env');
-const globalData = require('../data/data');
 const Logger = require('../utils/Logger');
 const ParallelUtils = require('../utils/Parallel');
 const metrics = require('../utils/metrics');
+const { sendAlert } = require('../utils/alerts');
 const Model = require('../models/BlockSubscribe');
 
 const EVENT_TYPES = {
@@ -865,40 +864,16 @@ class BlockSubscribe extends Service {
     }
 
     async _sendAlert({ currentNodeId, targetNodeId }) {
-        if (!env.GLS_SLACK_ALERT_WEB_HOOK) {
-            return;
-        }
-
         try {
             const currentNode = this._extractNodeHost(currentNodeId);
             const targetNode = this._extractNodeHost(targetNodeId);
 
-            const data = {
-                text: `Service "${globalData.serviceName || 'unknown'}"`,
-                attachments: [
-                    {
-                        color: 'warning',
-                        title: 'Nats node have been switched',
-                        text: `to "${targetNode}" from "${currentNode}"`,
-                        ts: Date.now(),
-                    },
-                ],
-            };
-
-            const response = await fetch(env.GLS_SLACK_ALERT_WEB_HOOK, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data),
+            sendAlert({
+                title: 'Nats node have been switched',
+                text: `to "${targetNode}" from "${currentNode}"`,
             });
-
-            if (!response.ok) {
-                throw new Error(`Request failed: ${response.status}, ${response.statusText}`);
-            }
         } catch (err) {
-            Logger.warn('Sending slack alert failed:', err);
+            Logger.warn('Sending alert failed:', err);
         }
     }
 
