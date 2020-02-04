@@ -94,15 +94,17 @@ class MongoDB extends Service {
         delete options.connectionRetries;
 
         return new Promise(resolve => {
+            let connection = mongoose.connection;
+
             const connect = () => {
                 Logger.info('Connecting to MongoDB...');
                 mongoose.connect(forceConnectString || env.GLS_MONGO_CONNECT, {
                     useNewUrlParser: true,
                     ...options,
                 });
+                connection = mongoose.connection
             };
 
-            const connection = mongoose.connection;
 
             connection.on('error', error => {
                 metrics.inc('mongo_error');
