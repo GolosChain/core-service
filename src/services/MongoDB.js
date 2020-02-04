@@ -109,7 +109,7 @@ class MongoDB extends Service {
                 Logger.error('MongoDB error:', error);
                 Logger.info('Reconnecting to MongoDB in 5 sec.');
                 if (this.connectionRetries === this.maxConnectionRetries) {
-                    Logger.error('Too much connection retries, exiting');
+                    Logger.error('Too much MongoDB connection retries, exiting');
                     process.exit(1);
                 }
                 this.connectionRetries++;
