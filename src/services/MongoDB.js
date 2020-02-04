@@ -89,23 +89,38 @@ class MongoDB extends Service {
      * @returns {Promise<*>} Промис без экстра данных.
      */
     async start(forceConnectString = null, options = {}) {
+        this.connectionRetries = 0;
+        this.maxConnectionRetries = options.connectionRetries || 10;
+        delete options.connectionRetries;
+
         return new Promise(resolve => {
+            const connect = () => {
+                Logger.info('Connecting to MongoDB...');
+                mongoose.connect(forceConnectString || env.GLS_MONGO_CONNECT, {
+                    useNewUrlParser: true,
+                    ...options,
+                });
+            };
+
             const connection = mongoose.connection;
 
             connection.on('error', error => {
                 metrics.inc('mongo_error');
                 Logger.error('MongoDB error:', error);
-                process.exit(1);
+                Logger.info('Reconnecting to MongoDB in 5 sec.');
+                if (this.connectionRetries === this.maxConnectionRetries) {
+                    Logger.error('Too much connection retries, exiting');
+                    process.exit(1);
+                }
+                this.connectionRetries++;
+                setTimeout(connect, 5000);
             });
-            connection.once('open', () => {
+            connection.on('open', () => {
                 Logger.info('MongoDB connection established.');
                 resolve();
             });
 
-            mongoose.connect(forceConnectString || env.GLS_MONGO_CONNECT, {
-                useNewUrlParser: true,
-                ...options,
-            });
+            connect();
         });
     }
 
