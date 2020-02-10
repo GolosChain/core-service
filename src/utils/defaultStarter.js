@@ -1,3 +1,4 @@
+const data = require('../data/data');
 const Logger = require('../utils/Logger');
 
 /**
@@ -5,9 +6,14 @@ const Logger = require('../utils/Logger');
  * достаточно лишь передать главный класс приложения.
  * Существует по причине полной аналогии способа запуска
  * все нынешних микросервисов на базе core.
- * @param {Basic} Main Главный класс приложения.
+ * @param {Basic} Main - главный класс приложения.
+ * @param {string} [serviceName] - имя сервиса, используется для более точного логирования.
  */
-module.exports = Main => {
+module.exports = function(Main, serviceName) {
+    if (serviceName) {
+        data.serviceName = serviceName;
+    }
+
     new Main().start().then(
         () => {
             Logger.info('Main service started!');

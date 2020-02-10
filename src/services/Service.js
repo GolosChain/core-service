@@ -72,19 +72,17 @@ class Service {
 
     /**
      * Старт сервиса.
-     * @param {...*} [args] Аргументы.
-     * @returns {Promise<void>} Промис без экстра данных.
+     * @returns {Promise<void>}
      */
-    async start(...args) {
+    async start() {
         await this.startNested();
     }
 
     /**
      * Остановка сервиса.
-     * @param {...*} [args] Аргументы.
-     * @returns {Promise<void>} Промис без экстра данных.
+     * @returns {Promise<void>}
      */
-    async stop(...args) {
+    async stop() {
         await this.stopNested();
     }
 
