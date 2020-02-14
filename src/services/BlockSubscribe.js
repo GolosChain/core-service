@@ -395,7 +395,10 @@ class BlockSubscribe extends Service {
 
     _onConnectionClose() {
         Logger.warn('Nats connection closed');
+        this._reconnect();
+    }
 
+    _reconnect() {
         this._unsubscribe();
         this._scheduleReconnect();
     }
@@ -476,9 +479,14 @@ class BlockSubscribe extends Service {
     }
 
     _scheduleReconnect() {
-        Logger.warn('Nats connection closed, reconnect scheduled.');
+        if (this._reconnectTimeoutId) {
+            return;
+        }
 
-        setTimeout(() => {
+        Logger.warn('Nats reconnect scheduled');
+
+        this._reconnectTimeoutId = setTimeout(() => {
+            this._reconnectTimeoutId = null;
             this._connectToMessageBroker();
         }, RECONNECT_DELAY);
     }
@@ -663,10 +671,13 @@ class BlockSubscribe extends Service {
 
         if (sequence <= this._lastProcessedSequence) {
             if (!env.GLS_USE_ONLY_RECENT_BLOCKS) {
-                Logger.warn('Received message with sequence less or equal than already processed.');
-                Logger.warn(
+                Logger.error(
+                    'Received message with sequence less or equal than already processed.'
+                );
+                Logger.error(
                     `Last processed: ${this._lastProcessedSequence}, received sequence: ${sequence}`
                 );
+                this._reconnect();
             }
             return;
         }
