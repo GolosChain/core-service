@@ -205,8 +205,7 @@ class BlockSubscribe extends Service {
     }
 
     _onConnectionClose() {
-        this._unsubscribe();
-        this._scheduleReconnect();
+        this._reconnect();
     }
 
     _onConnectionError(err) {
@@ -214,14 +213,23 @@ class BlockSubscribe extends Service {
             Logger.error('Nats error:', err.message);
         }
 
+        this._reconnect();
+    }
+
+    _reconnect() {
         this._unsubscribe();
         this._scheduleReconnect();
     }
 
     _scheduleReconnect() {
-        Logger.warn('Blockchain block broadcaster connection closed, reconnect scheduled.');
+        Logger.warn('Blockchain block broadcaster reconnect scheduled.');
 
-        setTimeout(() => {
+        if (this._reconnectTimeoutId) {
+            return;
+        }
+
+        this._reconnectTimeoutId = setTimeout(() => {
+            this._reconnectTimeoutId = null;
             this._connectToMessageBroker();
         }, 5000);
     }
@@ -309,6 +317,10 @@ class BlockSubscribe extends Service {
     }
 
     _unsubscribe() {
+        if (!this._connection) {
+            return;
+        }
+
         this._connection.removeListener('connect', this._onConnectionConnect);
         this._connection.removeListener('close', this._onConnectionClose);
         this._connection.removeListener('error', this._onConnectionError);
@@ -397,6 +409,8 @@ class BlockSubscribe extends Service {
                 Logger.warn(
                     `Last processed: ${this._lastProcessedSequence}, received sequence: ${sequence}`
                 );
+
+                this._reconnect();
             }
             return;
         }
