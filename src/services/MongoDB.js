@@ -93,6 +93,10 @@ class MongoDB extends Service {
         this.maxConnectionRetries = options.connectionRetries || 10;
         delete options.connectionRetries;
 
+        if (env.GLS_DB_LOGS_ENABLED) {
+            mongoose.set('debug', true);
+        }
+
         return new Promise(resolve => {
             let connection = mongoose.connection;
 
@@ -102,26 +106,9 @@ class MongoDB extends Service {
                     useNewUrlParser: true,
                     ...options,
                 });
-                connection = mongoose.connection
+                connection = mongoose.connection;
+                this._bindConnectionEvents(connection, connect, resolve);
             };
-
-
-            connection.on('error', error => {
-                metrics.inc('mongo_error');
-                Logger.error('MongoDB error:', error);
-                Logger.info('Reconnecting to MongoDB in 5 sec.');
-                if (this.connectionRetries === this.maxConnectionRetries) {
-                    Logger.error('Too much MongoDB connection retries, exiting');
-                    process.exit(1);
-                }
-                this.connectionRetries++;
-                setTimeout(connect, 5000);
-            });
-            connection.on('open', () => {
-                Logger.info('MongoDB connection established.');
-                resolve();
-            });
-
             connect();
         });
     }
@@ -133,6 +120,25 @@ class MongoDB extends Service {
     async stop() {
         await mongoose.disconnect();
         Logger.info('MongoDB disconnected.');
+    }
+
+    _bindConnectionEvents(connection, connectionFunction, resolve) {
+        connection.on('error', error => {
+            metrics.inc('mongo_error');
+            Logger.error('MongoDB error:', error);
+            Logger.info('Reconnecting to MongoDB in 5 sec.');
+            if (this.connectionRetries === this.maxConnectionRetries) {
+                Logger.error('Too much MongoDB connection retries, exiting');
+                process.exit(1);
+            }
+            this.connectionRetries++;
+            setTimeout(connectionFunction, 5000);
+        });
+
+        connection.on('open', () => {
+            Logger.info('MongoDB connection established.');
+            resolve();
+        });
     }
 }
 
