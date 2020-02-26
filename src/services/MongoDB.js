@@ -98,16 +98,13 @@ class MongoDB extends Service {
         }
 
         return new Promise(resolve => {
-            let connection = mongoose.connection;
-
             const connect = () => {
                 Logger.info('Connecting to MongoDB...');
                 mongoose.connect(forceConnectString || env.GLS_MONGO_CONNECT, {
                     useNewUrlParser: true,
                     ...options,
                 });
-                connection = mongoose.connection;
-                this._bindConnectionEvents(connection, connect, resolve);
+                this._bindConnectionEvents(mongoose.connection, connect, resolve);
             };
             connect();
         });
@@ -126,11 +123,11 @@ class MongoDB extends Service {
         connection.on('error', error => {
             metrics.inc('mongo_error');
             Logger.error('MongoDB error:', error);
-            Logger.info('Reconnecting to MongoDB in 5 sec.');
             if (this.connectionRetries === this.maxConnectionRetries) {
                 Logger.error('Too much MongoDB connection retries, exiting');
                 process.exit(1);
             }
+            Logger.info('Reconnecting to MongoDB in 5 sec.');
             this.connectionRetries++;
             setTimeout(connectionFunction, 5000);
         });
