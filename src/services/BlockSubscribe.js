@@ -1,9 +1,12 @@
+const path = require('path');
+const child = require('child_process');
 const nats = require('node-nats-streaming');
 const Service = require('./Service');
 const env = require('../data/env');
 const Logger = require('../utils/Logger');
 const ParallelUtils = require('../utils/Parallel');
 const metrics = require('../utils/metrics');
+const { sendAlert } = require('../utils/alerts');
 const Model = require('../models/BlockSubscribe');
 
 const EVENT_TYPES = {
@@ -12,10 +15,16 @@ const EVENT_TYPES = {
     FORK: 'FORK',
 };
 
+const CHECK_ACTIVITY_EVERY = 30 * 1000;
+const RECONNECT_DELAY = 10 * 1000;
+const RECONNECT_RETRY_LIMIT = 30;
+const NO_MESSAGES_RECONNECT_TIMEOUT = 2 * 60 * 1000;
+const NO_MESSAGES_RECONNECT_RETRY_LIMIT = 5;
+
 /**
  * Сервис подписки получения новых блоков.
  * Подписывается на рассылку блоков от CyberWay-ноды.
- * Каждый полученный блок сериализуется и передается в обработчик handle,
+ * Каждый полученный блок десериализуется и передается в обработчик handle,
  * также этот метод гарантирует последовательное поступление блоков.
  * Колбек вызвается через await.
  *
@@ -66,20 +75,52 @@ class BlockSubscribe extends Service {
     constructor({
         serverName = env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
         clientName = env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME,
-        connectString = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
+        natsConnect = env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
         handler,
         captureProducers,
     } = {}) {
         super();
 
-        this._connection = null;
+        this._serverName = serverName;
+        this._clientName = clientName;
+        this._natsConnect = natsConnect;
+        this._captureProducers = Boolean(captureProducers);
+
+        this._noMessagesReconnect = 0;
+
+        this._resetState();
 
         this._onConnectionConnect = this._onConnectionConnect.bind(this);
         this._onConnectionClose = this._onConnectionClose.bind(this);
         this._onConnectionError = this._onConnectionError.bind(this);
 
-        this._nastConnectParams = [serverName, clientName, { url: connectString }];
+        this._parallelUtils = new ParallelUtils();
 
+        this._handler = this._parallelUtils.consequentially(async event => {
+            if (event instanceof Function) {
+                event();
+                return;
+            }
+
+            switch (event.type) {
+                case EVENT_TYPES.BLOCK:
+                    await this._setLastBlock(event.data);
+                    break;
+                case EVENT_TYPES.IRREVERSIBLE_BLOCK:
+                    if (event.isRealIrreversible) {
+                        await this._setLastIrreversibleBlock(event.data);
+                    }
+                    break;
+                default:
+                // Do nothing
+            }
+
+            await handler(event);
+        });
+    }
+
+    _resetState() {
+        this._connection = null;
         this._subscriber = null;
 
         this._eventsQueue = new Map();
@@ -88,40 +129,44 @@ class BlockSubscribe extends Service {
         this._blockNumTransactions = new Map();
         this._completeBlocksQueue = new Map();
         this._waitForFirstEvent = true;
+        this._lastIrreversibleBlockNum = null;
         this._lastEmittedBlockNum = null;
         this._lastEmittedIrreversibleBlockNum = null;
         this._ignoreSequencesLess = null;
-
-        this._parallelUtils = new ParallelUtils();
-
-        this._handler = this._parallelUtils.consequentially(async event => {
-            if (event.type === EVENT_TYPES.BLOCK) {
-                await this._setLastBlock(event.data);
-            }
-            await handler(event);
-        });
-
-        this._captureProducers = Boolean(captureProducers);
+        this._subscribedAt = null;
+        this._lastMessageReceivedAt = null;
+        this._connectionErrors = 0;
     }
 
     /**
      * Запуск сервиса.
      */
     async start() {
+        await super.start();
+
         await this._initMetadata();
         await this._extractMetaData();
+        await this._validateNodeId();
+
         this._connectToMessageBroker();
+    }
+
+    async stop() {
+        clearInterval(this._eventMonitoringInterval);
+
+        await super.stop();
     }
 
     /**
      * Получить мета-данные последнего блока.
-     * @return {{lastBlockSequence: number, lastBlockNum: number}}
+     * @return {{nodeId: string, lastBlockSequence: number, lastBlockNum: number}}
      * Номер блока в очереди транслятора, номер блока в блокчейне.
      */
     async getLastBlockMetaData() {
         const model = await Model.findOne(
             {},
             {
+                nodeId: true,
                 lastBlockNum: true,
                 lastBlockSequence: true,
             },
@@ -130,12 +175,14 @@ class BlockSubscribe extends Service {
 
         if (!model) {
             return {
+                nodeId: null,
                 lastBlockNum: 0,
                 lastBlockSequence: 0,
             };
         }
 
         return {
+            nodeId: model.nodeId || env.DEFAULT_NATS_NODE_ID,
             lastBlockNum: model.lastBlockNum,
             lastBlockSequence: model.lastBlockSequence,
         };
@@ -174,9 +221,15 @@ class BlockSubscribe extends Service {
         }
     }
 
-    async _extractMetaData() {
-        const { lastBlockNum, lastBlockSequence } = await this.getLastBlockMetaData();
+    async _updateMeta(updates) {
+        await Model.updateOne({}, { $set: updates });
+        Logger.info('Block subscribe meta updated:', updates);
+    }
 
+    async _extractMetaData() {
+        const { nodeId, lastBlockNum, lastBlockSequence } = await this.getLastBlockMetaData();
+
+        this._nodeId = nodeId;
         this._lastBlockNum = lastBlockNum;
         this._lastEmittedBlockNum = lastBlockNum;
 
@@ -191,39 +244,251 @@ class BlockSubscribe extends Service {
         }
     }
 
+    async _validateNodeId() {
+        const firstNodeId = Object.keys(this._natsConnect)[0];
+
+        if (!firstNodeId) {
+            Logger.error('Invalid nats connections settings:', this._natsConnect);
+            process.exit(1);
+        }
+
+        // If first run (no nodeId saved).
+        if (!this._nodeId) {
+            Logger.info('Set nats node id to:', firstNodeId);
+            await this._updateMeta({
+                nodeId: firstNodeId,
+            });
+            this._nodeId = firstNodeId;
+            return;
+        }
+
+        const connectString = this._natsConnect[this._nodeId];
+
+        if (!connectString) {
+            if (!(await this._switchNode(firstNodeId))) {
+                Logger.error('Critical: Node switch failed');
+                process.exit(1);
+            }
+        }
+    }
+
+    async _switchNode(targetNodeId) {
+        Logger.info('Nats node switch process is started');
+
+        const { lastIrrBlockId, lastIrrBlockNum } = await Model.findOne(
+            {},
+            { lastIrrBlockId: true, lastIrrBlockNum: true },
+            { lean: true }
+        );
+
+        if (lastIrrBlockId) {
+            Logger.info('Irreversible block found, start switching process with data:', {
+                targetNodeId,
+                lastIrrBlockId,
+                lastIrrBlockNum,
+            });
+
+            let seq = null;
+
+            try {
+                seq = await this._findIrreversibleBlockInNats(
+                    targetNodeId,
+                    lastIrrBlockId,
+                    lastIrrBlockNum
+                );
+            } catch (err) {
+                Logger.warn('findIrreversibleBlockInNats failed:', err);
+                return false;
+            }
+
+            Logger.info(`Sequence on new node (${targetNodeId}) found:`, seq);
+
+            this._handler({
+                type: EVENT_TYPES.FORK,
+                data: {
+                    baseBlockNum: lastIrrBlockNum,
+                },
+            });
+
+            await this._waitQueueEmpty();
+
+            await this._updateMeta({
+                nodeId: targetNodeId,
+                lastBlockNum: lastIrrBlockNum,
+                lastBlockSequence: seq,
+            });
+        } else {
+            await this._updateMeta({
+                nodeId: targetNodeId,
+            });
+        }
+
+        await this._extractMetaData();
+
+        return true;
+    }
+
+    async _findIrreversibleBlockInNats(nodeId, irrBlockId, irrBlockNum) {
+        return new Promise((resolve, reject) => {
+            const connectString = this._natsConnect[nodeId];
+
+            const script = child.fork(
+                path.join(__dirname, '../../scripts/nats-find-seq.js'),
+                [JSON.stringify({ connectString, blockId: irrBlockId, blockNum: irrBlockNum })],
+                {
+                    stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+                }
+            );
+
+            const chunks = [];
+
+            script.stdout.on('data', data => {
+                chunks.push(data);
+            });
+
+            script.stderr.on('data', data => {
+                Logger.error('nats-find-seq.js error:', data.toString());
+            });
+
+            script.on('exit', code => {
+                if (code !== 0) {
+                    Logger.error('nats-find-seq.js exited with error code:', code);
+                    reject(new Error('nats-find-seq failed'));
+                    return;
+                }
+
+                const result = JSON.parse(chunks.join(''));
+                Logger.info('nats-find-seq.js result:', result);
+                resolve(result.sequence);
+            });
+        });
+    }
+
     _connectToMessageBroker() {
-        this._connection = nats.connect(...this._nastConnectParams);
+        const connectString = this._natsConnect[this._nodeId];
+
+        if (!connectString) {
+            Logger.error(
+                `No nats connection string for node id: ${this._nodeId}:`,
+                this._natsConnect
+            );
+            process.exit(1);
+        }
+
+        this._connection = nats.connect(this._serverName, this._clientName, { url: connectString });
 
         this._connection.on('connect', this._onConnectionConnect);
         this._connection.on('close', this._onConnectionClose);
         this._connection.on('error', this._onConnectionError);
+
+        this._eventMonitoringInterval = setInterval(
+            this._checkEvents.bind(this),
+            CHECK_ACTIVITY_EVERY
+        );
     }
 
     _onConnectionConnect() {
         Logger.log('Blockchain block subscriber connected.');
+        this._connectionErrors = 0;
         this._subscribe();
     }
 
     _onConnectionClose() {
+        Logger.warn('Nats connection closed');
+        this._reconnect();
+    }
+
+    _reconnect() {
         this._unsubscribe();
         this._scheduleReconnect();
     }
 
-    _onConnectionError(err) {
-        if (err.code !== 'BAD_SUBJECT') {
-            Logger.error('Nats error:', err.message);
+    async _onConnectionError(err) {
+        Logger.error('Nats connection error:', err.message);
+
+        this._connectionErrors++;
+
+        if (this._connectionErrors >= RECONNECT_RETRY_LIMIT) {
+            if (await this._tryToSwitchNode()) {
+                return;
+            }
         }
 
         this._unsubscribe();
         this._scheduleReconnect();
     }
 
-    _scheduleReconnect() {
-        Logger.warn('Blockchain block broadcaster connection closed, reconnect scheduled.');
+    async _checkEvents() {
+        const lastActivity = this._lastMessageReceivedAt || this._subscribedAt;
 
-        setTimeout(() => {
+        if (lastActivity && lastActivity < Date.now() - NO_MESSAGES_RECONNECT_TIMEOUT) {
+            if (this._noMessagesReconnect >= NO_MESSAGES_RECONNECT_RETRY_LIMIT) {
+                if (await this._tryToSwitchNode()) {
+                    return;
+                }
+            }
+
+            this._noMessagesReconnect++;
+            this._onConnectionError(new Error('Timeout: no new messages'));
+        }
+    }
+
+    async _tryToSwitchNode() {
+        const currentNodeId = this._nodeId;
+
+        const targetNodeId = this._chooseNewNodeId();
+
+        if (!targetNodeId) {
+            return false;
+        }
+
+        this._unsubscribe();
+        await this._waitQueueEmpty();
+
+        if (!(await this._switchNode(targetNodeId))) {
+            return false;
+        }
+
+        this._sendAlert({ currentNodeId, targetNodeId });
+
+        this._resetState();
+        await this._extractMetaData();
+
+        this._connectToMessageBroker();
+
+        return true;
+    }
+
+    _waitQueueEmpty() {
+        return new Promise(resolve => {
+            this._handler(resolve);
+        });
+    }
+
+    _chooseNewNodeId() {
+        const anotherNodeIds = [...Object.keys(this._natsConnect)].filter(
+            nodeId => nodeId !== this._nodeId
+        );
+
+        if (!anotherNodeIds.length) {
+            return null;
+        }
+
+        // Выбираем случайную ноду из оставшихся
+        return anotherNodeIds[Math.floor(Math.random() * anotherNodeIds.length)];
+    }
+
+    _scheduleReconnect() {
+        if (this._reconnectTimeoutId) {
+            return;
+        }
+
+        Logger.warn('Nats reconnect scheduled');
+
+        this._reconnectTimeoutId = setTimeout(() => {
+            this._reconnectTimeoutId = null;
             this._connectToMessageBroker();
-        }, 5000);
+        }, RECONNECT_DELAY);
     }
 
     _subscribe() {
@@ -258,6 +523,10 @@ class BlockSubscribe extends Service {
                 process.exit(1);
             }
 
+            this._lastMessageReceivedAt = Date.now();
+            // Сбрасываем переменную храняющую количество переподключений
+            this._noMessagesReconnect = 0;
+
             try {
                 if (this._waitForFirstEvent) {
                     if (this._subscribeSeq && this._subscribeSeq !== sequence) {
@@ -285,6 +554,8 @@ class BlockSubscribe extends Service {
             }
         };
 
+        this._subscribedAt = Date.now();
+
         subscriber.on('message', handlerWrapper);
 
         this._subscriber = {
@@ -309,13 +580,17 @@ class BlockSubscribe extends Service {
     }
 
     _unsubscribe() {
-        this._connection.removeListener('connect', this._onConnectionConnect);
-        this._connection.removeListener('close', this._onConnectionClose);
-        this._connection.removeListener('error', this._onConnectionError);
+        clearInterval(this._eventMonitoringInterval);
 
-        // Вешаем пустой обработчик ошибки на отключаемое соединение,
-        // чтобы случайные ошибки из закрываемого соединения не убили приложение.
-        this._connection.on('error', () => {});
+        if (this._connection) {
+            this._connection.removeListener('connect', this._onConnectionConnect);
+            this._connection.removeListener('close', this._onConnectionClose);
+            this._connection.removeListener('error', this._onConnectionError);
+
+            // Вешаем пустой обработчик ошибки на отключаемое соединение,
+            // чтобы случайные ошибки из закрываемого соединения не убили приложение.
+            this._connection.on('error', () => {});
+        }
 
         if (this._subscriber) {
             const { subscriber, handler } = this._subscriber;
@@ -368,7 +643,10 @@ class BlockSubscribe extends Service {
     _handleTransactionApply(transaction) {
         metrics.inc('core_trx_apply');
 
-        if (this._lastIrreversibleNum && this._lastIrreversibleNum >= transaction.block_num) {
+        if (
+            this._lastIrreversibleBlockNum &&
+            this._lastIrreversibleBlockNum >= transaction.block_num
+        ) {
             return;
         }
 
@@ -393,10 +671,13 @@ class BlockSubscribe extends Service {
 
         if (sequence <= this._lastProcessedSequence) {
             if (!env.GLS_USE_ONLY_RECENT_BLOCKS) {
-                Logger.warn('Received message with sequence less or equal than already processed.');
-                Logger.warn(
+                Logger.error(
+                    'Received message with sequence less or equal than already processed.'
+                );
+                Logger.error(
                     `Last processed: ${this._lastProcessedSequence}, received sequence: ${sequence}`
                 );
+                this._reconnect();
             }
             return;
         }
@@ -482,7 +763,7 @@ class BlockSubscribe extends Service {
     _handleBlockCommit(block) {
         metrics.inc('core_block_commit');
 
-        this._lastIrreversibleNum = block.block_num;
+        this._lastIrreversibleBlockNum = block.block_num;
 
         this._processIrreversibleBlocks();
     }
@@ -500,12 +781,12 @@ class BlockSubscribe extends Service {
             startBlockNum = Math.min(...this._completeBlocksQueue.keys());
         }
 
-        for (let blockNum = startBlockNum; blockNum <= this._lastIrreversibleNum; blockNum++) {
+        for (let blockNum = startBlockNum; blockNum <= this._lastIrreversibleBlockNum; blockNum++) {
             const block = this._completeBlocksQueue.get(blockNum);
 
             if (!block) {
                 Logger.error(
-                    `Irreversible block (${blockNum}) is not found in queue, irreversible block num: ${this._lastIrreversibleNum}`
+                    `Irreversible block (${blockNum}) is not found in queue, irreversible block num: ${this._lastIrreversibleBlockNum}`
                 );
                 process.exit(1);
             }
@@ -515,6 +796,7 @@ class BlockSubscribe extends Service {
             this._handler({
                 type: EVENT_TYPES.IRREVERSIBLE_BLOCK,
                 data: block,
+                isRealIrreversible: blockNum === this._lastIrreversibleBlockNum,
             });
 
             this._lastEmittedIrreversibleBlockNum = block.blockNum;
@@ -544,12 +826,12 @@ class BlockSubscribe extends Service {
     }
 
     _cleanOldTransactions() {
-        if (!this._lastIrreversibleNum) {
+        if (!this._lastIrreversibleBlockNum) {
             return;
         }
 
         for (const blockNum of this._blockNumTransactions.keys()) {
-            if (blockNum <= this._lastIrreversibleNum) {
+            if (blockNum <= this._lastIrreversibleBlockNum) {
                 this._blockNumTransactions.delete(blockNum);
             }
         }
@@ -578,6 +860,48 @@ class BlockSubscribe extends Service {
                 },
             }
         );
+    }
+
+    async _setLastIrreversibleBlock(block) {
+        await Model.updateOne(
+            {},
+            {
+                $set: {
+                    lastIrrBlockId: block.id,
+                    lastIrrBlockNum: block.blockNum,
+                },
+            }
+        );
+    }
+
+    async _sendAlert({ currentNodeId, targetNodeId }) {
+        try {
+            const currentNode = this._extractNodeHost(currentNodeId);
+            const targetNode = this._extractNodeHost(targetNodeId);
+
+            sendAlert({
+                title: 'Nats node have been switched',
+                text: `to "${targetNode}" from "${currentNode}"`,
+            });
+        } catch (err) {
+            Logger.warn('Sending alert failed:', err);
+        }
+    }
+
+    _extractNodeHost(nodeId) {
+        if (!nodeId) {
+            return 'N/A';
+        }
+
+        const connectString = this._natsConnect[nodeId] || '';
+
+        const match = connectString.match(/^nats:\/\/[^@]+@(.+)$/);
+
+        if (!match) {
+            return `${nodeId} (address: N/A)`;
+        }
+
+        return `${nodeId}: ${match[1]}`;
     }
 }
 

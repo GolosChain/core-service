@@ -24,6 +24,7 @@
     "lodash.template": "^4.5.0",
     "moment": "^2.24.0",
     "mongoose": "^5.7.5",
+    "nats-queue-sync": "^0.1.1",
     "node-fetch": "^2.6.0",
     "node-nats-streaming": "^0.2.6",
     "prom-client": "^11.5.3",
