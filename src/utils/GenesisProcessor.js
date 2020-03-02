@@ -108,11 +108,13 @@ class GenesisProcessor {
                 reject,
             };
 
+            const natsConnectString = Object.values(env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT)[0];
+
             this._nats = nats.connect(
                 env.GLS_BLOCKCHAIN_BROADCASTER_SERVER_NAME,
                 env.GLS_BLOCKCHAIN_BROADCASTER_CLIENT_NAME + '-genesis',
                 {
-                    url: env.GLS_BLOCKCHAIN_BROADCASTER_CONNECT,
+                    url: natsConnectString,
                 }
             );
 
