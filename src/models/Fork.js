@@ -34,7 +34,7 @@ module.exports = MongoDB.makeModel(
                         type: MongoDB.mongoTypes.ObjectId,
                     },
                     data: {
-                        type: Object,
+                        type: MongoDB.schemaTypes.Mixed,
                     },
                     meta: {
                         type: Object,

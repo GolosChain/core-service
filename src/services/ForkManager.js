@@ -57,7 +57,7 @@ class ForkManager extends Service {
             type,
             className: Model.className,
             documentId,
-            data: data ? this._packData(data) : {},
+            data: this._packData(data),
         };
     }
 
@@ -207,7 +207,7 @@ class ForkManager extends Service {
     }
 
     async _revertItem({ type, className, documentId, data, meta }) {
-        const unpackedData = this._unpackData(data || {});
+        const unpackedData = this._unpackData(data);
         const Model = this._resolveModel(className);
 
         switch (type) {
@@ -226,50 +226,27 @@ class ForkManager extends Service {
     }
 
     _packData(data) {
-        try {
-            return this._packDataIteration(data, 0);
-        } catch (err) {
-            if (err === 'Too many recursion') {
-                throw new Error(err);
-            }
-
-            throw err;
-        }
-    }
-
-    _packDataIteration(data, iteration) {
-        if (iteration > 20) {
-            throw 'Too many recursion';
+        if (!data) {
+            return '';
         }
 
-        if (data && typeof data.toObject === 'function') {
+        if (typeof data.toObject === 'function') {
             data = data.toObject();
         }
 
-        if (data) {
-            const specialKeys = [];
-
-            for (const key of Object.keys(data)) {
-                if (key.indexOf('$') === 0) {
-                    specialKeys.push(key);
-                }
-
-                if (data[key] && typeof data[key] === 'object') {
-                    this._packDataIteration(data[key], iteration + 1);
-                }
-            }
-
-            for (const key of specialKeys) {
-                data[`@${key}`] = data[key];
-
-                delete data[key];
-            }
-        }
-
-        return data;
+        return JSON.stringify(data);
     }
 
     _unpackData(data) {
+        if (!data) {
+            return {};
+        }
+
+        if (typeof data === 'string') {
+            return JSON.parse(data);
+        }
+
+        // TODO: Legacy parsing for old format, remove in future.
         const specialKeys = [];
 
         for (const key of Object.keys(data)) {
