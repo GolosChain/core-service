@@ -207,7 +207,14 @@ class ForkManager extends Service {
     }
 
     async _revertItem({ type, className, documentId, data, meta }) {
-        const unpackedData = this._unpackData(data);
+        if (!data) {
+            data = {};
+        } else if (typeof data === 'string') {
+            data = JSON.parse(data);
+        } else {
+            data = this._unpackData(data);
+        }
+
         const Model = this._resolveModel(className);
 
         switch (type) {
@@ -216,11 +223,11 @@ class ForkManager extends Service {
                 break;
 
             case 'update':
-                await Model.updateOne({ _id: documentId }, unpackedData);
+                await Model.updateOne({ _id: documentId }, data);
                 break;
 
             case 'remove':
-                await Model.create({ _id: documentId, ...unpackedData });
+                await Model.create({ _id: documentId, ...data });
                 break;
         }
     }
@@ -237,16 +244,8 @@ class ForkManager extends Service {
         return JSON.stringify(data);
     }
 
+    // TODO: Legacy, remove in future.
     _unpackData(data) {
-        if (!data) {
-            return {};
-        }
-
-        if (typeof data === 'string') {
-            return JSON.parse(data);
-        }
-
-        // TODO: Legacy parsing for old format, remove in future.
         const specialKeys = [];
 
         for (const key of Object.keys(data)) {
