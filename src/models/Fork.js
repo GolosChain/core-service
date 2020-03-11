@@ -26,10 +26,7 @@ module.exports = MongoDB.makeModel(
                         type: String,
                         required: true,
                     },
-                    modelName: {
-                        type: String,
-                    },
-                    // TODO: className for backward compatibility, remove later.
+                    // using className because of modelName is restricted by mongoose lib.
                     className: {
                         type: String,
                     },

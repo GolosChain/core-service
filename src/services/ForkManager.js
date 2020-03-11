@@ -55,7 +55,7 @@ class ForkManager extends Service {
     _prepareItem({ type, Model, documentId, data, meta }) {
         return {
             type,
-            modelName: Model.modelName,
+            className: Model.className,
             documentId,
             data: data ? this._packData(data) : {},
         };
@@ -206,9 +206,9 @@ class ForkManager extends Service {
         }
     }
 
-    async _revertItem({ type, modelName, /* legacy */ className, documentId, data, meta }) {
+    async _revertItem({ type, className, documentId, data, meta }) {
         const unpackedData = this._unpackData(data || {});
-        const Model = this._resolveModel(modelName || className);
+        const Model = this._resolveModel(className);
 
         switch (type) {
             case 'create':
