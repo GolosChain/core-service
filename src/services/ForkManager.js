@@ -1,3 +1,4 @@
+const { isNil } = require('lodash');
 const Service = require('./Service');
 const Logger = require('../utils/Logger');
 const ForkModel = require('../models/Fork');
@@ -156,16 +157,29 @@ class ForkManager extends Service {
             }
         );
 
-        let lastFinalized = null;
+        if (!items.length) {
+            Logger.error(`Fatal Error: No revert blocks!`);
+            process.exit(1);
+            return;
+        }
+
         const unfinalized = [];
+        const topItem = items[0];
+        let lastFinalized = null;
 
-        for (const item of items) {
-            if (item.finalized) {
-                lastFinalized = item;
-                break;
+        // TODO: for backward compatibility, remove positive branch of if in future.
+        if (isNil(topItem.finalized)) {
+            unfinalized.push(topItem);
+            lastFinalized = items[1];
+        } else {
+            for (const item of items) {
+                if (item.finalized) {
+                    lastFinalized = item;
+                    break;
+                }
+
+                unfinalized.push(item);
             }
-
-            unfinalized.push(item);
         }
 
         if (!lastFinalized) {
