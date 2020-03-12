@@ -4,7 +4,7 @@ const Logger = require('../utils/Logger');
 const ForkModel = require('../models/Fork');
 
 class ForkManager extends Service {
-    constructor({ resolveModel } = {}) {
+    constructor({ resolveModel, customActions, afterBlocksRevert } = {}) {
         if (!resolveModel) {
             throw new Error('Param resolveModel is not specified');
         }
@@ -12,6 +12,8 @@ class ForkManager extends Service {
         super();
 
         this._resolveModel = resolveModel;
+        this._customActions = customActions;
+        this._afterBlocksRevert = afterBlocksRevert;
 
         this._running = false;
     }
@@ -52,7 +54,14 @@ class ForkManager extends Service {
         );
     }
 
-    _prepareItem({ type, Model, documentId, data, meta }) {
+    _prepareItem(params) {
+        const { type, Model, documentId, data } = params;
+        const c = this._customActions;
+
+        if (c && c[type] && c[type].prepareItem) {
+            return c[type].prepareItem(params);
+        }
+
         return {
             type,
             className: Model.className,
@@ -119,6 +128,10 @@ class ForkManager extends Service {
             }
 
             await ForkModel.deleteOne({ _id: block._id });
+        }
+
+        if (this._afterBlocksRevert) {
+            await this._afterBlocksRevert(blocks);
         }
     }
 
@@ -206,7 +219,17 @@ class ForkManager extends Service {
         }
     }
 
-    async _revertItem({ type, className, documentId, data, meta }) {
+    async _revertItem(params) {
+        const { type, className, documentId } = params;
+        const c = this._customActions;
+
+        if (c && c[type] && c[type].revertItem) {
+            await c[type].revertItem(params);
+            return;
+        }
+
+        let { data } = params;
+
         if (!data) {
             data = {};
         } else if (typeof data === 'string') {
