@@ -59,7 +59,7 @@ class ForkManager extends Service {
         const c = this._customActions;
 
         if (c && c[type] && c[type].prepareItem) {
-            return c[type].prepareItem(params);
+            return c[type].prepareItem.call(this, params);
         }
 
         return {
@@ -224,7 +224,7 @@ class ForkManager extends Service {
         const c = this._customActions;
 
         if (c && c[type] && c[type].revertItem) {
-            await c[type].revertItem(params);
+            await c[type].revertItem.call(this, params);
             return;
         }
 
