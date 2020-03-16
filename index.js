@@ -5,6 +5,7 @@ const BasicMainService = require('./src/services/BasicMain');
 const MongoDBService = require('./src/services/MongoDB');
 const ConnectorService = require('./src/services/Connector');
 const BlockSubscribe = require('./src/services/BlockSubscribe');
+const ForkManager = require('./src/services/ForkManager');
 
 const UtilsLogger = require('./src/utils/Logger');
 const UtilsMoments = require('./src/utils/Moments');
@@ -40,6 +41,7 @@ module.exports = {
         Basic: Service, // For backward compatibility
         BasicMain: BasicMainService,
         BlockSubscribe,
+        ForkManager,
         MongoDB: MongoDBService,
         Connector: ConnectorService,
     },

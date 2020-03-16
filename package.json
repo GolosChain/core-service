@@ -1,6 +1,6 @@
 {
   "name": "cyberway-core-service",
-  "version": "3.57.0",
+  "version": "3.58.6",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -21,6 +21,7 @@
     "eosjs-ecc": "^4.0.4",
     "express": "^4.17.1",
     "jayson": "^2.1.2",
+    "lodash": "^4.17.15",
     "lodash.template": "^4.5.0",
     "moment": "^2.24.0",
     "mongoose": "^5.7.5",
