@@ -168,7 +168,7 @@ class Service {
         const processEvent = async () => {
             if (isFirstSignal) {
                 setTimeout(() => {
-                    Logger.error('Stopping is taken more than 15 sec, start force exit');
+                    Logger.error('Stopping has taken more than 15 sec, start force exit');
                     process.exit(10);
                 }, 15000).unref();
 
