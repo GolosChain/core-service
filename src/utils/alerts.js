@@ -10,10 +10,12 @@ const ALLOWED_TYPES = ['warning', 'error', 'danger'];
  * @param {'warning'|'error'|'danger'} [type] (default: 'warning')
  * @param {string} title
  * @param {string} text
+ * @param {string} [prefix]
+ * @param {string} [suffix]
  * @param {number} [timestamp]
  */
 
-function sendAlert({ type = 'warning', title, text, timestamp }) {
+function sendAlert({ type = 'warning', title, text, prefix, suffix, timestamp }) {
     if (!ALLOWED_TYPES.includes(type)) {
         throw new Error('Invalid type');
     }
@@ -26,14 +28,14 @@ function sendAlert({ type = 'warning', title, text, timestamp }) {
         type = 'danger';
     }
 
-    _sendAlert({ type, title, text, timestamp }).catch(err => {
+    _sendAlert({ type, title, text, prefix, suffix, timestamp }).catch(err => {
         Logger.warn('Sending alert failed:', err);
     });
 }
 
-async function _sendAlert({ type, title, text, timestamp }) {
+async function _sendAlert({ type, title, text, prefix, suffix, timestamp }) {
     const data = {
-        text: `Service "${globalData.serviceName || 'unknown'}"`,
+        text: `${prefix || ''}Service "${globalData.serviceName || 'unknown'}${suffix || ''}"`,
         attachments: [
             {
                 color: type,
