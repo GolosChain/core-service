@@ -160,11 +160,38 @@ class Service {
     }
 
     /**
-     * Устанавливает обработчик на сигнал SIGINT (Ctrl-C и прочее),
-     * который вызывает метод stop.
+     * Устанавливает обработчик на сигнал завершения.
      */
     stopOnExit() {
-        process.on('SIGINT', this.stop.bind(this));
+        let isFirstSignal = true;
+
+        const processEvent = async () => {
+            if (isFirstSignal) {
+                setTimeout(() => {
+                    Logger.error('Stopping has taken more than 15 sec, start force exit');
+                    process.exit(10);
+                }, 15000).unref();
+
+                try {
+                    Logger.info('Start stopping');
+                    await this.stop();
+                } catch (err) {
+                    Logger.error('Error while stopping:', err);
+                    process.exit(9);
+                    return;
+                }
+
+                process.exit(0);
+            } else {
+                Logger.error('Start force exit');
+                process.exit(5);
+            }
+
+            isFirstSignal = false;
+        };
+
+        process.on('SIGINT', processEvent);
+        process.on('SIGTERM', processEvent);
     }
 
     /**
