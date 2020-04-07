@@ -64,7 +64,7 @@ class ForkManager extends Service {
 
         return {
             type,
-            className: Model.className,
+            className: Model.modelName,
             documentId,
             data: this._packData(data),
         };
